@@ -9,38 +9,48 @@ Repository: `CynaCons/powerroadmap` — renamed from `CynaCons/powerplanner` on
 2026-10-28. Observations recorded before that date name the old repository and
 are left as they were observed; the old name still resolves.
 
-## Current state — observed 2026-10-29
+## Current state — observed 2026-10-30
 
 | Surface | State | Observed |
 |---|---|---|
-| GitHub release (latest) | `v2.28.0`, non-draft, not prerelease, published 2026-10-29T17:15:20Z from `main` | `gh release view v2.28.0 --json` |
-| Release assets | `PowerRoadmap.html` alone — 403,919 bytes, `state=uploaded`. One file, not three; see below. | `gh release view --json assets` |
-| Asset integrity | downloaded and hashed: `873682e964bdeb81c42e14ca83ca8712be68eaa218103c905ac89f8cf1c70fe6`, identical to the raw update route and to the committed `dist-template/index.html` | `gh release download` + `sha256sum` |
-| Published app runs | the downloaded asset was served and opened: 39 rows, 99 bars, status bar `v2.28.0`, zero console errors | browser |
-| Build & Release workflow | `completed/success` for tag `v2.28.0`, 53s | `gh run list` |
-| Web CI | `completed/success` on `main`, 50s | same |
+| GitHub release (latest) | `v2.34.1`, non-draft, not prerelease, published 2026-10-30T19:36:41Z from `main` | `gh release view v2.34.1 --json` |
+| Release assets | `PowerRoadmap.html` alone — 419,816 bytes, `state=uploaded` | `gh release view --json assets` |
+| Asset integrity | `94356d662a3b550150f35bc74bbf4ad6957f6124057ff82f9ebe59d8f1a381eb`, and **five independent reads agree**: the digest GitHub reports, the downloaded asset, the raw update route at the tag, the committed git blob, and the on-disk template | `gh release download`, `curl`, `git cat-file`, `sha256sum` |
+| Published app runs | the downloaded asset opened **straight off the filesystem, no server**: 39 rows, 33 bars, 7 milestones, 2 markers, 6 dependencies, status bar `2.34.1`, zero console errors, and the chart held 1152×826 across selection | browser |
+| Build & Release workflow | `completed/success` for tag `v2.34.1`, 1m5s, run `41116526426` | `gh run list` |
+| Web CI | `completed/success` on `main`, 1m13s, run `41116415088` | same |
 | GitHub Pages | HTTP 200 at https://cynacons.github.io/powerroadmap/ | `curl` |
-| Pages content | landing site from `site/`; no live app demo | `deploy-site.yml` |
-| `src/version.ts` | `2.28.0` | repo |
-| `package.json` | `2.28.0` — matches | repo |
+| Pages deploy | **none for this release, correctly** — `site/` is untouched by the nine commits, and `deploy-site.yml` only runs on a push that touches it. Last deploy 2026-10-28. | `git diff --name-only -- site/`, `gh run list --workflow deploy-site.yml` |
+| `src/version.ts` | `2.34.1` | repo |
+| `package.json` | `2.34.1` — matches | repo |
 | `dist-template/index.html` | tracked; the CI rebuild at the tag reproduced the committed bytes exactly, so the blob digest and the on-disk digest agree and `git status` is clean | repo |
 | npm | not a surface — nothing published | DECISIONS.md D5 |
 | MCP Registry | not a surface — nothing published | DECISIONS.md D5 |
 
-### The update routes, re-measured at v2.28.0
+The bar count moved from 99 at v2.28.0 to 33 here. That is a counting change,
+not a regression: 99 was three SVG rects per bar, and 33 agrees with what the
+status bar itself reports — `33 tasks`.
 
-All four fetched 2026-10-29 after the release, not inferred:
+### The update routes, re-measured at v2.34.1
+
+All four fetched 2026-10-30 after the release, not inferred:
 
 | Route | Observed |
 |---|---|
-| `raw…/CynaCons/powerroadmap/main/package.json` | `2.28.0` |
-| `api.github.com/repos/CynaCons/powerroadmap/releases/latest` | `v2.28.0` |
-| `api.github.com/repos/CynaCons/powerplanner/releases/latest` — the **old** name, which every build before v2.20.0 asks for | `v2.28.0`, through the rename redirect |
-| `raw…/CynaCons/powerroadmap/v2.28.0/dist-template/index.html` | 403,919 bytes, digest `873682e9…` — identical to the published asset |
+| `raw…/CynaCons/powerroadmap/main/package.json` | `2.34.1` |
+| `api.github.com/repos/CynaCons/powerroadmap/releases/latest` | `v2.34.1` |
+| `api.github.com/repos/CynaCons/powerplanner/releases/latest` — the **old** name, which every build before v2.20.0 asks for | `v2.34.1`, through a `301` to `/repositories/1250571066/releases/latest` |
+| `raw…/CynaCons/powerroadmap/v2.34.1/dist-template/index.html` | `200`, 419,816 bytes, digest `94356d66…` — identical to the published asset |
 
 The third row is the one that matters: builds in the wild compiled the old
 repository name in and cannot be corrected remotely. They still find this
 release.
+
+The digest trap below did not spring this time, and the reason is the one the
+section gives: `dist-template/index.html` had been written by
+`npm run build:template`, so it was LF on disk and matched its own blob. Hashing
+the working copy happened to be safe here. It is still the wrong habit — hash
+the blob.
 
 ### A digest trap on Windows
 
@@ -86,7 +96,8 @@ What cannot be dropped is the **old repository name**. `api.github.com/repos/
 CynaCons/powerplanner/releases/latest` is still what every build before v2.20.0
 asks for, and it resolves only because GitHub redirects a renamed repository.
 That redirect is the single point of failure for those builds; re-measure it at
-every release. At v2.28.0 it returned `v2.28.0`.
+every release. At v2.28.0 it returned `v2.28.0`; at v2.34.1 it returned
+`v2.34.1`, as a `301` to `/repositories/1250571066/releases/latest`.
 
 GitHub also attaches a source zip and tarball to every release automatically.
 They cannot be removed, and they are not ours.
@@ -172,6 +183,40 @@ so `performUpdate` takes the download branch, and that was left for the owner
 to click. Everything up to the write is observed; the write itself is browser
 plumbing and independent of the rename.
 
+### Observed: a real v2.28.0 build finding v2.34.1
+
+Done 2026-10-30, immediately after publishing v2.34.1, and it goes further than
+the v2.19.0 run above: this time the bytes the updater would install were
+hashed inside the page.
+
+The published **v2.28.0** asset was served over `http://localhost:5198`. Not a
+simulation — no module stubbed, no checker logic re-implemented. The gear button
+in that build's own header, then **Check for updates** inside its Settings
+dialog, which is where the control lives in a build that predates the side
+panel. The dialog then read `Version 2.34.1 is available.` with a primary button
+labelled `Update to 2.34.1`.
+
+| What | Observed |
+|---|---|
+| The build's own version | `2.28.0`, from its Settings dialog and its status bar |
+| `UpdateInfo` the UI call produced | `available: true`, `latestVersion: 2.34.1`, `tag: v2.34.1`, and both URLs carrying the **new** repository name |
+| Which build asked | the cache entry it wrote has `forVersion: "2.28.0"` |
+| The release API from the page | `200`, `tag_name: v2.34.1`, asset `PowerRoadmap.html` 419,816 bytes |
+| The route `fetchBuild` takes | `200`, `text/plain`, 419,816 bytes |
+| `looksRight()`, the guard it applies | `<div id="root">` present |
+| **The bytes it would install** | in-page SHA-256 `94356d66…` — **identical to the published asset** |
+| CORS | nothing blocked; both cross-origin bodies were readable, which is the proof |
+
+`access-control-allow-origin` read back as `null` on both responses. That is not
+a missing header: ACAO is not a CORS-safelisted response header, so page JS
+cannot read it by design. The evidence is that the bodies were readable at all —
+a wrong ACAO throws `TypeError: Failed to fetch` instead.
+
+**Still not exercised:** the write. `performUpdate` was never called and the
+button was never clicked. Served over http there is no file handle, so it would
+take the download branch anyway. The read side is now proven to the byte; the
+write remains the owner's click.
+
 ## Update route — the one the in-app updater uses
 
 Verified live on 2026-10-26, not inferred:
@@ -214,6 +259,7 @@ parked, and `web-ci.yml` covers lint, unit, build and the single-file build.
 
 | Date | Surface | Version | Note |
 |---|---|---|---|
+| 2026-10-30 | GitHub release | v2.34.1 | Six closed iterations since v2.28.0: the save round-trip repaired, the controls moved to a side panel, multi-row selection, mark placement, label editing and bar styling. Full e2e before the tag — 444 reported, 252 passed, 192 skipped by project, 0 failed — and it took three runs, the first two red on real defects. Nine commits; the last published tag had been v2.28.0, so v2.29.0–v2.34.0 were never tagged and ship inside this one. |
 | 2026-10-29 | GitHub release | v2.28.0 | Six iterations from the owner's live walkthrough. First release to publish one asset instead of three. e2e not run before the tag, by the owner's instruction. |
 | 2026-10-28 | GitHub release | v2.21.0 | Last release to carry the three byte-identical aliases. |
 | 2026-08-07 | GitHub release | v2.11.0 | Web agent bridge. No assets attached. |
