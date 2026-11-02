@@ -26,10 +26,17 @@ test.describe('the details dialog edits what you picked', () => {
   });
 
   test('Enter does nothing with several things selected', async ({ page }) => {
-    const bars = page.locator('[data-pp-kind="task"]');
+    // `.task-bar-body`, not `[data-pp-kind="task"]`: the latter also matches
+    // each bar's two grips and its progress handle, so nth(0)/nth(2)/nth(4)
+    // were rects of the same one or two tasks rather than three different
+    // ones. That was invisible until shift-click learned to take a bar back
+    // OUT of a selection (SRS-EDIT-088), at which point clicking the same bar
+    // twice stopped being a no-op.
+    const bars = page.locator('.task-bar-body');
     await bars.nth(0).click();
+    await bars.nth(1).click({ modifiers: ['Shift'] });
     await bars.nth(2).click({ modifiers: ['Shift'] });
-    await bars.nth(4).click({ modifiers: ['Shift'] });
+    await expect(page.locator('.app-status')).toContainText('3 selected');
 
     await page.locator('.chart-area svg').first().press('Enter');
     await expect(page.locator('[role="dialog"]')).toHaveCount(0);

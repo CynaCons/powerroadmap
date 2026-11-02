@@ -29,12 +29,26 @@ async function ready(page: Page) {
   if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
 }
 
-/** The chrome actually on screen, counted from the DOM rather than inferred. */
+/**
+ * The chrome actually on screen, counted from the DOM rather than inferred.
+ *
+ * Counted BY KIND since SRS-EDIT-088: every kind of element now reports its
+ * own selected state, not only task bars, so clicking a bar paints two things
+ * — the bar and the row it sits on, which is what the gutter highlight is.
+ * A bare count of `[data-pp-selected]` would read 2 and say nothing about
+ * which two.
+ */
 async function paintedSelection(page: Page) {
-  return page.evaluate(() => ({
-    bars: document.querySelectorAll('[data-pp-selected="1"]').length,
-    status: document.querySelector('.app-status')?.textContent ?? '',
-  }));
+  return page.evaluate(() => {
+    const painted = [...document.querySelectorAll('[data-pp-selected="1"]')];
+    const by = (kind: string) => painted.filter((e) => e.getAttribute('data-pp-kind') === kind).length;
+    return {
+      bars: by('task'),
+      rows: by('row'),
+      total: painted.length,
+      status: document.querySelector('.app-status')?.textContent ?? '',
+    };
+  });
 }
 
 test.describe('selection paints when it changes', () => {
@@ -49,7 +63,10 @@ test.describe('selection paints when it changes', () => {
     // the user sees after clicking once.
     const after = await paintedSelection(page);
     expect(after.status).toContain('1 selected');
-    expect(after.bars).toBe(1);
+    expect(after.bars, 'the bar that was clicked is not painted').toBe(1);
+    // The gutter lights up with it — one selection shown in two places.
+    expect(after.rows, 'the row the bar sits on is not painted with it').toBe(1);
+    expect(after.total, 'something else got painted too').toBe(2);
   });
 
   test('Escape stops painting it, in the same frame', async ({ page }) => {

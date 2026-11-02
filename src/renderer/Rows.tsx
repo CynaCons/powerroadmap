@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { useDocumentStore } from '../stores/documentStore';
 import { useSelectionStore } from '../stores/selectionStore';
 import type { Row } from '../types/document';
@@ -19,7 +19,7 @@ interface Props {
  * rule lands above each group header and nowhere else — the gutter's indent
  * and weight carry the rest (owner report 2026-10-23).
  */
-export function Rows({ rows, rowHeights, rowOffsets, width }: Props) {
+function RowsInner({ rows, rowHeights, rowOffsets, width }: Props) {
   const allRows = useDocumentStore((s) => s.doc.rows);
   const hasChildren = new Set(allRows.filter((r) => r.groupId).map((r) => r.groupId as string));
   const doc = useDocumentStore((s) => s.doc);
@@ -100,3 +100,15 @@ export function Rows({ rows, rowHeights, rowOffsets, width }: Props) {
     </g>
   );
 }
+
+/**
+ * Memoised because nothing here changes while a bar is dragged or a title is
+ * typed (SRS-LAY-057).
+ *
+ * React re-renders a child whenever its parent renders, whatever the props
+ * are, so narrowing the layout memo stopped the layout being RECOMPUTED but
+ * not the whole chart being reconciled. Measured at 6x CPU throttle, ten
+ * keystrokes in the title cost 3,855ms before and 3,749ms after that change
+ * alone — indistinguishable. The reconciliation was the cost.
+ */
+export const Rows = memo(RowsInner);

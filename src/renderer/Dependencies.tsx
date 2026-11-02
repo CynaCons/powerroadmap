@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useIsSelected } from '../stores/selectionStore';
 import type { LayoutResult } from '../layout/engine';
 
@@ -23,7 +24,7 @@ interface Props {
  * schedule; the press targets are `DependencyHits`, painted UNDER the bars
  * (SRS-EDIT-077).
  */
-export function Dependencies({ layout }: Props) {
+function DependenciesInner({ layout }: Props) {
   const isSelected = useIsSelected();
 
   return (
@@ -74,12 +75,18 @@ export function Dependencies({ layout }: Props) {
  * length that no bar covers, which is nearly all of it.
  */
 export function DependencyHits({ layout }: Props) {
+  // The hit layer is what a test or an agent finds by `data-pp-kind`, so it is
+  // where the selected state has to be readable (SRS-EDIT-088). Only task bars
+  // carried it before: with a milestone or a link selected the footer said
+  // "1 selected" and nothing in the DOM said which.
+  const isSelected = useIsSelected();
   return (
     <g>
       {layout.dependencies.map((ld) => (
         <path
           key={ld.dependency.id}
           data-pp-kind="dependency"
+          data-pp-selected={isSelected(ld.dependency.id) ? '1' : undefined}
           data-pp-id={ld.dependency.id}
           d={ld.path}
           fill="none"
@@ -91,3 +98,15 @@ export function DependencyHits({ layout }: Props) {
     </g>
   );
 }
+
+/**
+ * Memoised because nothing here changes while a bar is dragged or a title is
+ * typed (SRS-LAY-057).
+ *
+ * React re-renders a child whenever its parent renders, whatever the props
+ * are, so narrowing the layout memo stopped the layout being RECOMPUTED but
+ * not the whole chart being reconciled. Measured at 6x CPU throttle, ten
+ * keystrokes in the title cost 3,855ms before and 3,749ms after that change
+ * alone — indistinguishable. The reconciliation was the cost.
+ */
+export const Dependencies = memo(DependenciesInner);

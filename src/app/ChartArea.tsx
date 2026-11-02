@@ -16,7 +16,7 @@ import { Brackets } from '../renderer/Brackets';
 import { Dependencies, DependencyHits } from '../renderer/Dependencies';
 import { Markers } from '../renderer/Markers';
 import { RowGutter } from '../renderer/RowGutter';
-import { useChartInteractions } from './useChartInteractions';
+import { POINTER_EVENTS, useChartInteractions } from './useChartInteractions';
 import type { ChartGeometry } from '../layout/geometry';
 import { chordKeys } from './keymap';
 import { ConnectorOverlay } from './ConnectorOverlay';
@@ -132,9 +132,27 @@ export function ChartArea() {
     didInitialFit.current = true;
   }, [size.width, size.height, doc.tasks, doc.milestones, fit, chartWidth]);
 
+  /**
+   * Keyed on what the engine reads, not on the document (SRS-LAY-057).
+   *
+   * It was keyed on `doc`, so a keystroke in the TITLE — which `layoutDocument`
+   * never looks at — re-laid-out every row, task, milestone, bracket and
+   * dependency and re-rendered the whole sheet. Measured before: ten keystrokes
+   * cost 21 long tasks and 1,446ms of blocked main thread.
+   *
+   * The list below is the whole of what the engine touches, and
+   * `tests/unit/layoutInputs.test.ts` reads both this file and `engine.ts` and
+   * fails the day they stop agreeing — otherwise this is the kind of narrowing
+   * that goes stale in silence.
+   */
   const layout = useMemo(
     () => layoutDocument({ doc, viewStart, pxPerDay }),
-    [doc, viewStart, pxPerDay],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately narrower than `doc`; see above
+    [
+      doc.rows, doc.tasks, doc.milestones, doc.brackets, doc.dependencies,
+      doc.calendar, doc.style.allowOverlap,
+      viewStart, pxPerDay,
+    ],
   );
 
   const axis = useMemo(
@@ -230,6 +248,23 @@ export function ChartArea() {
   );
 
   /**
+   * How much ink a vertical rule gets, from how far apart the rules are
+   * (SRS-TAX-060).
+   *
+   * Full weight once they are far enough apart to count — about 28px — and
+   * fading to a quarter as they crowd. Measured on the default roadmap: a
+   * week grain at 1.44 px/day puts them 10.1px apart, which is where the
+   * hatching came from.
+   */
+  const delimiterInk = useMemo(() => {
+    if (delimiters.length < 2) return 1;
+    const pitch = delimiters[1] - delimiters[0];
+    if (pitch >= 28) return 1;
+    if (pitch <= 8) return 0.25;
+    return +(0.25 + (0.75 * (pitch - 8)) / 20).toFixed(3);
+  }, [delimiters]);
+
+  /**
    * The geometry every gesture inverts, assigned on every render so a window
    * listener installed once still reads today's value (SRS-EDIT-033). Four
    * copies of this used to be captured by closure, each stale in its own way.
@@ -256,7 +291,7 @@ export function ChartArea() {
   const isEmpty = doc.tasks.length === 0 && doc.milestones.length === 0 && doc.brackets.length === 0;
 
   return (
-    <div ref={containerRef} className="chart-area" onMouseDown={(e) => { if (e.target === e.currentTarget) clear(); }}>
+    <div ref={containerRef} className="chart-area" onPointerDown={(e) => { if (e.target === e.currentTarget) clear(); }} onMouseDown={(e) => { if (!POINTER_EVENTS && e.target === e.currentTarget) clear(); }}>
       {isEmpty && (
         <div className="empty-state">
           <div className="empty-title">Your chart is empty</div>
@@ -271,7 +306,22 @@ export function ChartArea() {
         ref={svgRef}
         width={size.width}
         height={size.height}
-        onMouseDown={handleSvgMouseDown}
+        /* One tab stop, and a name (SRS-EDIT-086). The chart had neither, so
+           it was absent from the keyboard entirely — while the picture it
+           EXPORTS already carried `role="img"`. Not `img` here: that would
+           make every bar inside it presentational. `application` tells a
+           screen reader to pass the arrow keys through, which is what moves
+           the selection. */
+        tabIndex={0}
+        role="application"
+        aria-label={`${doc.title || 'Untitled plan'} — roadmap chart, ${layout.visibleRows.length} rows, ${doc.tasks.length} tasks. Arrow up and down select, left and right move what is selected.`}
+        /* Pointer, not mouse: a finger and a pen send these too
+           (SRS-EDIT-085). The mouse name is kept for environments with no
+           `PointerEvent` — which in practice means jsdom, where the unit
+           suite drives this same handler. */
+        {...(POINTER_EVENTS
+          ? { onPointerDown: handleSvgMouseDown }
+          : { onMouseDown: handleSvgMouseDown })}
         onContextMenu={handleContextMenu}
         /* No `onWheel`: the interaction hook registers a non-passive native
            listener instead, because React's is passive and its
@@ -358,6 +408,14 @@ export function ChartArea() {
               <line
                 key={`gd-${i}`}
                 className={gridDelimiter === 'day' ? 'grid-delimiter' : 'grid-delimiter grid-delimiter--period'}
+                /* The GRAIN is the planner's setting and never the zoom
+                   (SRS-TAX-055). The INK is a different question: 91 rules
+                   10.1px apart read as hatching rather than as a reference,
+                   and were 13% of the chart's nodes making the bars harder to
+                   see. So the rules a reader can count are drawn at full
+                   weight and the ones they cannot fade back, while remaining
+                   exactly the rules they asked for (SRS-TAX-060). */
+                opacity={delimiterInk}
                 x1={x}
                 y1={0}
                 x2={x}

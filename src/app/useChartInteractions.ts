@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { RefObject, MouseEvent as ReactMouseEvent } from 'react';
+import type { RefObject, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { useDocumentStore } from '../stores/documentStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { useSelectionStore, type Selectable } from '../stores/selectionStore';
@@ -220,7 +220,7 @@ export function useChartInteractions({ svgRef, geomRef }: InteractionOptions) {
   }, [svgRef, handleWheel]);
 
   const handleSvgMouseDown = useCallback(
-    (e: ReactMouseEvent<SVGSVGElement>) => {
+    (e: ReactPointerEvent<SVGSVGElement>) => {
       if (e.button !== 0) return;
 
       // Sweeping the time axis picks the window to zoom to: press where the
@@ -415,19 +415,27 @@ export function useChartInteractions({ svgRef, geomRef }: InteractionOptions) {
         return;
       }
       if (kind === 'task' || kind === 'milestone' || kind === 'bracket' || kind === 'dependency' || kind === 'marker') {
+        // Selecting a bar also selects the row it sits on, so the gutter
+        // highlights with it — one selection, two views of it. `companionFor`
+        // records which of the two the planner actually pointed at, so the
+        // rest of the app stops having to guess (SRS-EDIT-088).
+        const owner =
+          kind === 'task' ? doc.tasks.find((t) => t.id === id)?.rowId
+          : kind === 'milestone' ? doc.milestones.find((m) => m.id === id)?.rowId
+          : undefined;
         if (!additive) {
-          // Selecting a bar also selects the row it sits on, so the gutter
-          // highlights with it — one selection, two views of it.
-          const owner =
-            kind === 'task' ? doc.tasks.find((t) => t.id === id)?.rowId
-            : kind === 'milestone' ? doc.milestones.find((m) => m.id === id)?.rowId
-            : undefined;
           selStore.setSelection([
             { kind: kind as 'task' | 'milestone' | 'bracket' | 'dependency' | 'marker', id },
-            ...(owner ? [{ kind: 'row' as const, id: owner }] : []),
+            ...(owner ? [{ kind: 'row' as const, id: owner, companionFor: id }] : []),
           ]);
-        } else if (!selStore.isSelected(id)) {
-          selStore.add({ kind: kind as 'task' | 'milestone' | 'bracket' | 'dependency' | 'marker', id });
+        } else {
+          // Ctrl-click used to add and never take away: the test was
+          // `if (!isSelected(id)) add(...)`, so a second ctrl-click on an
+          // already-selected bar did nothing at all (SRS-EDIT-088).
+          selStore.toggle({ kind: kind as 'task' | 'milestone' | 'bracket' | 'dependency' | 'marker', id });
+          if (owner && selStore.isSelected(id)) {
+            selStore.add({ kind: 'row', id: owner, companionFor: id });
+          }
         }
       }
       // Dependency and marker are selection-only (no drag)
@@ -873,20 +881,54 @@ export function useChartInteractions({ svgRef, geomRef }: InteractionOptions) {
 }
 
 let attached = false;
+/**
+ * Pointer events, not mouse events (SRS-EDIT-085).
+ *
+ * The drag loop listened for `mousemove`/`mouseup`, which a finger never
+ * sends. Measured on an 820x1180 touch context: ten touch moves across 120px
+ * left a bar exactly where it started, while the same drag with a mouse in
+ * the same browser context moved it 122.6px. The product ships into a
+ * Microsoft Office task pane and onto tablets, and its primary verb did not
+ * answer a finger.
+ *
+ * `PointerEvent` extends `MouseEvent`, so every handler below reads the same
+ * `clientX`/`clientY`/`button` it always did — one mouse drag is still exactly
+ * one pointer drag. `pointercancel` is new and matters: the system can take a
+ * gesture away (a palm, a call, a gesture-nav swipe) and without it the drag
+ * would hang mid-flight with the window listeners still attached.
+ */
+/**
+ * Pointer events where they exist, mouse events where they do not.
+ *
+ * Every browser this ships to has `PointerEvent`; jsdom, where the unit suite
+ * runs, does not. Rather than leave the drag loop untestable there — or quietly
+ * test something other than what ships — the event NAMES are chosen once and
+ * the handlers below are the same either way. The unit suite therefore
+ * exercises this code through its mouse names, and `tests/e2e/touch-and-targets.spec.ts`
+ * exercises it through its pointer names in a real browser, with a finger.
+ */
+export const POINTER_EVENTS = typeof window !== 'undefined' && typeof window.PointerEvent === 'function';
+const MOVE_EVENT = POINTER_EVENTS ? 'pointermove' : 'mousemove';
+const UP_EVENT = POINTER_EVENTS ? 'pointerup' : 'mouseup';
+
 function attachWindowListeners(
   move: (e: globalThis.MouseEvent) => void,
   up: (e: globalThis.MouseEvent) => void,
 ): void {
   if (attached) return;
-  window.addEventListener('mousemove', move);
-  window.addEventListener('mouseup', up);
+  window.addEventListener(MOVE_EVENT, move);
+  window.addEventListener(UP_EVENT, up);
+  // The system can take a gesture away — a palm, a call, a navigation swipe —
+  // and without this the drag would hang with its listeners still attached.
+  if (POINTER_EVENTS) window.addEventListener('pointercancel', up);
   attached = true;
 }
 function detachWindowListeners(
   move: (e: globalThis.MouseEvent) => void,
   up: (e: globalThis.MouseEvent) => void,
 ): void {
-  window.removeEventListener('mousemove', move);
-  window.removeEventListener('mouseup', up);
+  window.removeEventListener(MOVE_EVENT, move);
+  window.removeEventListener(UP_EVENT, up);
+  if (POINTER_EVENTS) window.removeEventListener('pointercancel', up);
   attached = false;
 }

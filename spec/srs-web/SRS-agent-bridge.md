@@ -85,6 +85,7 @@ session recorder and is out of scope here.
 | SRS-ABR-060 | While a bridge session is active, the app shall display a persistent indication that an agent may be editing. | The user must never be unable to explain why their document is changing. | Demo (live gate) | B1d |
 | SRS-ABR-061 | The user shall be able to end a bridge session at any time from the UI, taking effect without a page reload. | Withdrawal of consent must be immediate and local. | Test (e2e) | B2e |
 | SRS-ABR-062 | A live session in which an agent authors a plan while the user watches shall be reviewed for interaction quality, and that review shall be a required gate. | Unit, protocol, and e2e layers cannot observe whether the experience is good; only watching it can. | Demo (user gate) | B4e; design §7 |
+| SRS-ABR-063 `[web]` | The agent bridge control shall reach a failed state with a reason when it cannot connect, rather than reporting Connecting indefinitely. | AgentBridgeToggle only reaches its error state if start() THROWS; a socket that never opens leaves onStatusChange(false) mapping to connecting for ever. Observed here: a stale bridge process from a session four days earlier held the fixed port, and the control sat on Connecting with no timeout, no reason and no hint that the port was the problem. | Test: tests/unit/agentBridgeToggle.test.ts | agent/AgentBridgeToggle connect timeout |
 
 ## Open items
 

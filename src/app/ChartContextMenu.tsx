@@ -1,12 +1,13 @@
 import { useContextMenuStore } from '../stores/contextMenuStore';
 import { useDocumentStore } from '../stores/documentStore';
-import { useSelectionStore } from '../stores/selectionStore';
+import { useSelectionStore, selectionSubjects } from '../stores/selectionStore';
 import { useEditStore } from '../stores/editStore';
 import { useViewStore } from '../stores/viewStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { ContextMenu, type ContextMenuItem } from './ContextMenu';
 import { LabelPositionPicker } from './LabelPositionPicker';
 import { Pencil, Copy, Trash2, Plus, Diamond, Brackets as BracketIcon, Flag, GitBranch, SlidersHorizontal, ArrowUp, ArrowDown, FolderPlus, FolderInput, Rows3 } from 'lucide-react';
+import { deleteSelection } from './documentActions';
 import { newId } from '../utils/ids';
 import { addDays, todayISO } from '../utils/dates';
 import type { DependencyType, LabelPlacement } from '../types/document';
@@ -69,6 +70,26 @@ export function ChartContextMenu() {
   const reveal = useViewportStore((s) => s.reveal);
 
   if (!open || !target) return null;
+
+  /**
+   * The menu's Delete acts on the whole selection, like the Del key
+   * (SRS-EDIT-088).
+   *
+   * Each delete item used to name one id, so with four bars selected the
+   * menu's "Delete task" removed exactly one of them, posted no notice, and
+   * left the footer still reading "4 selected" — while Del on the same
+   * selection took all four and said so. Right-clicking an item that is
+   * already in a selection keeps that selection, so by the time this menu is
+   * open the selection IS what the planner means.
+   */
+  const picked = selectionSubjects(useSelectionStore.getState().items);
+  const inSelection = picked.some((i) => i.id === target.id);
+  const deleteLabel = (noun: string) =>
+    inSelection && picked.length > 1 ? `Delete ${picked.length} items` : `Delete ${noun}`;
+  const deleteWhatIsPicked = (justThisOne: () => void) => {
+    if (inSelection && picked.length > 1) deleteSelection();
+    else justThisOne();
+  };
 
   const items: ContextMenuItem[] = [];
 
@@ -264,7 +285,7 @@ export function ChartContextMenu() {
       ),
     );
     items.push({ id: 's1', separator: true });
-    items.push({ id: 'del', label: 'Delete task', icon: Trash2, danger: true, shortcut: 'Del', onClick: () => docActions.deleteTask(task.id) });
+    items.push({ id: 'del', label: deleteLabel('task'), icon: Trash2, danger: true, shortcut: 'Del', onClick: () => deleteWhatIsPicked(() => docActions.deleteTask(task.id)) });
   }
 
   if (target.kind === 'milestone' && target.id) {
@@ -295,7 +316,7 @@ export function ChartContextMenu() {
       ),
     );
     items.push({ id: 's1', separator: true });
-    items.push({ id: 'del', label: 'Delete milestone', icon: Trash2, danger: true, onClick: () => docActions.deleteMilestone(m.id) });
+    items.push({ id: 'del', label: deleteLabel('milestone'), icon: Trash2, danger: true, shortcut: 'Del', onClick: () => deleteWhatIsPicked(() => docActions.deleteMilestone(m.id)) });
   }
 
   if (target.kind === 'bracket' && target.id) {
@@ -307,7 +328,7 @@ export function ChartContextMenu() {
       onClick: () => openDetails(target.id!, 'bracket'),
     });
     items.push({ id: 's1', separator: true });
-    items.push({ id: 'del', label: 'Delete bracket', icon: Trash2, danger: true, onClick: () => docActions.deleteBracket(target.id!) });
+    items.push({ id: 'del', label: deleteLabel('bracket'), icon: Trash2, danger: true, shortcut: 'Del', onClick: () => deleteWhatIsPicked(() => docActions.deleteBracket(target.id!)) });
   }
 
   if (target.kind === 'dependency' && target.id) {
@@ -322,7 +343,7 @@ export function ChartContextMenu() {
       });
     }
     items.push({ id: 's1', separator: true });
-    items.push({ id: 'del', label: 'Delete dependency', icon: Trash2, danger: true, onClick: () => docActions.deleteDependency(dep.id) });
+    items.push({ id: 'del', label: deleteLabel('dependency'), icon: Trash2, danger: true, shortcut: 'Del', onClick: () => deleteWhatIsPicked(() => docActions.deleteDependency(dep.id)) });
   }
 
   if (target.kind === 'marker' && target.id) {
@@ -341,7 +362,7 @@ export function ChartContextMenu() {
       },
     });
     items.push({ id: 's1', separator: true });
-    items.push({ id: 'del', label: 'Delete marker', icon: Trash2, danger: true, onClick: () => docActions.deleteMarker(target.id!) });
+    items.push({ id: 'del', label: deleteLabel('marker'), icon: Trash2, danger: true, shortcut: 'Del', onClick: () => deleteWhatIsPicked(() => docActions.deleteMarker(target.id!)) });
   }
 
   if (items.length === 0) { close(); return null; }

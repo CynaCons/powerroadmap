@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, memo } from 'react';
 import type { Row } from '../types/document';
 import { useDocumentStore } from '../stores/documentStore';
+import { useIsSelected } from '../stores/selectionStore';
 import { InlineLabel } from '../app/InlineLabel';
 import { truncateToGutter, X_CHILD, X_GROUP, X_TOP, RIGHT_PAD } from '../layout/gutterWidth';
 
@@ -23,8 +24,9 @@ interface Props {
  * The spine colour is taken from the group's own tasks rather than stored on
  * the row, so it can never disagree with the bars it labels.
  */
-export function RowGutter({ rows, rowHeights, rowOffsets, width }: Props) {
+function RowGutterInner({ rows, rowHeights, rowOffsets, width }: Props) {
   const updateRow = useDocumentStore((s) => s.updateRow);
+  const isSelected = useIsSelected();
   // Renaming belongs here, on the name itself, not in the bottom bar — the bar
   // is for quick actions (owner directive 2026-10-26).
   const [editing, setEditing] = useState<string | null>(null);
@@ -82,6 +84,7 @@ export function RowGutter({ rows, rowHeights, rowOffsets, width }: Props) {
             key={row.id}
             data-pp-kind="row"
             data-pp-id={row.id}
+            data-pp-selected={isSelected(row.id) ? '1' : undefined}
             transform={`translate(0 ${rowOffsets[i]})`}
             onDoubleClick={() => setEditing(row.id)}
             // The row selects on a click and renames on a double-click, so the
@@ -168,3 +171,15 @@ export function RowGutter({ rows, rowHeights, rowOffsets, width }: Props) {
     </g>
   );
 }
+
+/**
+ * Memoised because nothing here changes while a bar is dragged or a title is
+ * typed (SRS-LAY-057).
+ *
+ * React re-renders a child whenever its parent renders, whatever the props
+ * are, so narrowing the layout memo stopped the layout being RECOMPUTED but
+ * not the whole chart being reconciled. Measured at 6x CPU throttle, ten
+ * keystrokes in the title cost 3,855ms before and 3,749ms after that change
+ * alone — indistinguishable. The reconciliation was the cost.
+ */
+export const RowGutter = memo(RowGutterInner);

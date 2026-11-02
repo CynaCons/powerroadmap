@@ -1100,13 +1100,38 @@ Four questions the prototypes must put in front of the owner, because they are v
 - [x] Gate the chart against resizing when the selection changes [agent: claude]
 - [x] Cover the open path for every format it reads [agent: claude]
 
-### v2.34.2 — What the post-release tests found (current) (ACTIVE)
+### v2.34.2 — What the post-release tests found (COMPLETE)
 **Goal:** The app reads correctly on a phone and in a dark theme.
 - [x] Keep the header wordmark clear of the toolbar on a phone [agent: claude]
 - [x] Follow the operating system's dark setting on first open [agent: claude]
 - [x] Keep the row labels inside their gutter on a phone [agent: claude]
 - [x] Stop the axis labels printing over each other [agent: claude]
 - [x] Lift the panel's faintest text to a readable contrast [agent: claude]
+
+### v2.35.0 — A round of polish on handling, reach and readability (COMPLETE)
+**Goal:** The chart handles by touch, reaches by keyboard, and reads more clearly.
+- [x] Keep the resize grip live when the pointer arrives from outside [agent: claude]
+- [x] Make bars draggable by finger, not only by mouse [agent: claude]
+- [x] Give the chart a focus stop and keyboard selection [agent: claude]
+- [x] Stop a keystroke in the title relaying out the chart [agent: claude]
+- [x] Lift the faintest text to a readable contrast [agent: claude]
+- [x] Widen the small hit targets without changing how they look [agent: claude]
+- [x] Thin the vertical rules the way the axis thins its labels [agent: claude]
+- [x] Tell a deadline from today by colour, not only by dash [agent: claude]
+- [x] Announce which time scale is chosen [agent: claude]
+- [x] Honour the system's reduced-motion setting [agent: claude]
+- [x] Show when a dialog has more to scroll [agent: claude]
+- [x] Let the agent toggle fail instead of hanging [agent: claude]
+- [x] Make F2 rename a bar you picked by clicking it [agent: claude]
+- [x] Let ctrl-click take a bar back out of the selection [agent: claude]
+- [x] Report one selection count, not two that disagree [agent: claude]
+- [x] Delete the whole selection from the right-click menu [agent: claude]
+- [x] Take a row's dependencies with it when the row goes [agent: claude]
+- [x] Give milestones, markers and rows a hover state [agent: claude]
+- [x] Say in the DOM which element of any kind is selected [agent: claude]
+- [x] Let Enter and Space press the button that has focus [agent: claude]
+- [x] Give a dialog focus when it opens and keep it inside [agent: claude]
+- [x] Make a bar at zero per cent visible against the sheet [agent: claude]
 
 # Backlog (High-level, unscheduled — product & long-horizon only)
 - Cloud / sharing edition
@@ -1145,3 +1170,20 @@ See git for full historical web iterations (v0–v2).
 - The embed renderer hard-codes the axis height, leaving a dead strip
 - Ten delete call sites still remove items with nothing said
 - A held nudge merges two different tasks into one undo step
+- Saving a plan opened from .json or .yaml rewrites it as HTML under its old name
+- A date with a real shape but no such day wedges the chart into NaN
+- Export YAML loses everything after a bracket that has no rows
+- Printing a normal-sized plan drops the rows that do not fit the page
+- Show that the chart has more rows below the fold
+- Keep the connector dot clear of the bar's own label
+- The restore banner returns on every load and offers an untouched sample
+- apply_batch accepts documents the loader then refuses to open
+- A dependency cycle empties the critical path and says nothing
+- Give the context menu real menu keyboard behaviour and a name
+- The command palette's highlighted row is invisible to assistive tech
+- Two invisible colour inputs sit in the tab order
+- Add a pressed state; the stylesheet has no :active rule at all
+- Cancelling Save as still writes a file to Downloads
+- Selecting a second bar removes every styling control from the panel
+- The e2e suite spends minutes in teardown after the last test finishes
+- One tablet dependency test flakes about once in fifty runs

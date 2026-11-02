@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { X } from 'lucide-react';
 import { KEYMAP, GESTURES, chordKeys, type BindingGroup } from './keymap';
 import { useViewStore } from '../stores/viewStore';
+import { useDialogFocus } from './useDialogFocus';
 
 /**
  * The shortcuts sheet, rendered FROM the keymap (SRS-EDIT-041).
@@ -39,6 +40,11 @@ export function ShortcutsOverlay() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
+  // Focus belongs inside a modal while it is open (SRS-LAY-058): this sheet
+  // left activeElement on BODY and ten Tabs escaped it ten times out of ten.
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef, open);
+
   if (!open) return null;
 
   return (
@@ -53,11 +59,16 @@ export function ShortcutsOverlay() {
         zIndex: 9999,
       }}
     >
+      {/* `scroll-shadows` is what says there is more below (SRS-LAY-055): at
+          900px tall this sheet hides 156px of itself and cut the last row flush
+          with nothing to show for it. */}
       <div
+        ref={panelRef}
+        className="scroll-shadows"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: 'min(720px, 92vw)', maxHeight: '86vh', overflowY: 'auto',
-          background: 'var(--color-bg-elev)', border: '1px solid var(--color-border-hairline)',
+          border: '1px solid var(--color-border-hairline)',
           borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-3)', padding: 22,
         }}
       >

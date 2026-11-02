@@ -231,13 +231,19 @@ export function CommandBar() {
       <Section id="view" label="View">
         <div className="cmdbar__field">
           <span className="cmdbar__field-label">Scale</span>
-          <div className="cmdbar__scale">
+          {/* A radiogroup, like the Theme control seventy lines below that
+              looks exactly the same (SRS-LAY-056). This one announced itself
+              as five independent toggle buttons, so the control that sets the
+              chart's whole time window was the one that could not say which
+              of its options was chosen. */}
+          <div className="cmdbar__scale" role="radiogroup" aria-label="Time scale">
             {SCALES.map((s) => (
               <button
                 key={s}
+                role="radio"
                 className={scale === s ? 'is-active' : ''}
                 onClick={() => setScale(s)}
-                aria-pressed={scale === s}
+                aria-checked={scale === s}
                 title={`Scale: ${s[0].toUpperCase() + s.slice(1)}`}
               >
                 {SCALE_LABEL[s]}

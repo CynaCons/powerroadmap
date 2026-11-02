@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useViewportStore } from '../stores/viewportStore';
 import { useIsSelected } from '../stores/selectionStore';
 import type { LayoutResult } from '../layout/engine';
@@ -50,7 +51,7 @@ export function bracketRail(rowTop: number, bottomRowTop: number, bottomRowHeigh
   };
 }
 
-export function Brackets({ layout }: Props) {
+function BracketsInner({ layout }: Props) {
   const viewStart = useViewportStore((s) => s.startDate);
   const pxPerDay = useViewportStore((s) => s.pxPerDay);
   const isSelected = useIsSelected();
@@ -95,6 +96,7 @@ export function Brackets({ layout }: Props) {
             />
             <rect
               data-pp-kind="bracket"
+              data-pp-selected={selected ? '1' : undefined}
               data-pp-id={b.id}
               x={x}
               y={rail.railY - TICK_DROP}
@@ -162,3 +164,15 @@ export function Brackets({ layout }: Props) {
     </g>
   );
 }
+
+/**
+ * Memoised because nothing here changes while a bar is dragged or a title is
+ * typed (SRS-LAY-057).
+ *
+ * React re-renders a child whenever its parent renders, whatever the props
+ * are, so narrowing the layout memo stopped the layout being RECOMPUTED but
+ * not the whole chart being reconciled. Measured at 6x CPU throttle, ten
+ * keystrokes in the title cost 3,855ms before and 3,749ms after that change
+ * alone — indistinguishable. The reconciliation was the cost.
+ */
+export const Brackets = memo(BracketsInner);

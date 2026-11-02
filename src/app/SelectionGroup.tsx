@@ -1,6 +1,6 @@
 import { Trash2, SlidersHorizontal, Brackets as BracketIcon, Plus, Rows3, ChevronUp, ChevronDown } from 'lucide-react';
 import { useDocumentStore } from '../stores/documentStore';
-import { useSelectionStore, type Selectable } from '../stores/selectionStore';
+import { useSelectionStore, selectionSubjects, type Selectable } from '../stores/selectionStore';
 import { useViewStore } from '../stores/viewStore';
 import { addDays, todayISO } from '../utils/dates';
 import { newId } from '../utils/ids';
@@ -29,22 +29,26 @@ export function SelectionGroup() {
   const items = useSelectionStore((s) => s.items);
   const doc = useDocumentStore((s) => s.doc);
 
-  if (items.length === 0) return null;
-
   // The thing you clicked owns the bar; the row it sits on is selected too,
   // but only so the gutter highlights with it. Keying off the whole selection
   // instead would mean clicking a bar showed the ROW's actions, and colour,
   // dates, percent and notes would have no home at all.
-  const sel = items[0];
+  //
+  // This used to spot the companion with `items.length === 2 && items[1].kind
+  // === 'row'`, which held for one bar and failed for two: the panel then
+  // counted the companions and printed a number the footer disagreed with
+  // (SRS-EDIT-088).
+  const picked = selectionSubjects(items);
+  if (picked.length === 0) return null;
+
+  const sel = picked[0];
   if (sel.kind === 'row') {
-    const rowIds = items.filter((i) => i.kind === 'row').map((i) => i.id);
+    const rowIds = picked.filter((i) => i.kind === 'row').map((i) => i.id);
     return rowIds.length > 1 ? <RowsFields rowIds={rowIds} /> : <RowFields rowId={sel.id} />;
   }
 
-  // A bar plus its row is two items by design, so it is not a multi-select.
-  const isBarWithItsRow = items.length === 2 && items[1]?.kind === 'row';
-  if (items.length > 1 && !isBarWithItsRow) {
-    return <MultiFields count={items.length} />;
+  if (picked.length > 1) {
+    return <MultiFields count={picked.length} />;
   }
   if (sel.kind === 'task') {
     const task = doc.tasks.find((t) => t.id === sel.id);

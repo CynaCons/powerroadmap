@@ -1,5 +1,5 @@
 import { useDocumentStore } from '../stores/documentStore';
-import { useSelectionStore, type Selectable, type SelectableKind } from '../stores/selectionStore';
+import { useSelectionStore, selectionSubjects, type Selectable, type SelectableKind } from '../stores/selectionStore';
 import { bracketSpanFor } from './bracketSpan';
 import { useViewStore } from '../stores/viewStore';
 import { useViewportStore } from '../stores/viewportStore';
@@ -99,14 +99,13 @@ function doc() {
  */
 export function detailsSubject(items: Selectable[]): Selectable | null {
   const EDITABLE: SelectableKind[] = ['task', 'milestone', 'bracket', 'row'];
-  if (items.length === 1) {
-    return EDITABLE.includes(items[0].kind) ? items[0] : null;
-  }
-  // A bar plus the row it sits on is one thing, not a multi-selection.
-  if (items.length === 2 && items[1].kind === 'row' && EDITABLE.includes(items[0].kind)) {
-    return items[0];
-  }
-  return null;
+  // "A bar plus the row it sits on is one thing" was worked out here, in the
+  // status bar, in the selection panel and in the command bar, each slightly
+  // differently — and the places that never worked it out are where F2 and
+  // the right-click Delete broke. One derivation now (SRS-EDIT-088).
+  const subjects = selectionSubjects(items);
+  if (subjects.length !== 1) return null;
+  return EDITABLE.includes(subjects[0].kind) ? subjects[0] : null;
 }
 
 /**
@@ -119,6 +118,66 @@ export function detailsSubject(items: Selectable[]): Selectable | null {
  * presses Ctrl+Z means to be back where they started. The store's idle
  * backstop separates a later, deliberate press.
  */
+/**
+ * Everything in the chart a planner can pick, in the order the eye reads it
+ * (SRS-EDIT-086).
+ *
+ * Down the rows, and within a row the bars by when they start and then the
+ * marks by when they fall. Derived from the document rather than from the
+ * laid-out scene so that it is pure and so that a keyboard can reach things
+ * the viewport has scrolled past. The visibility rule is the engine's:
+ * children of a collapsed group are not there to be selected.
+ */
+function chartItemsInReadingOrder(): Selectable[] {
+  const doc = useDocumentStore.getState().doc;
+  const collapsed = new Set(doc.rows.filter((r) => r.collapsed).map((r) => r.id));
+  const visible = doc.rows.filter((r) => !r.groupId || !collapsed.has(r.groupId));
+  const out: Selectable[] = [];
+  for (const row of visible) {
+    for (const t of doc.tasks.filter((t) => t.rowId === row.id).sort((a, b) => a.start.localeCompare(b.start))) {
+      out.push({ kind: 'task', id: t.id });
+    }
+    for (const m of doc.milestones.filter((m) => m.rowId === row.id).sort((a, b) => a.date.localeCompare(b.date))) {
+      out.push({ kind: 'milestone', id: m.id });
+    }
+  }
+  return out;
+}
+
+/**
+ * Move the selection one step through that order (SRS-EDIT-086).
+ *
+ * Before this the chart had no keyboard at all: 48 focusable elements, 6 in
+ * the header, 40 in the side panel and 0 in the chart. Every editing shortcut
+ * the app documents — F2, Del, Enter, the arrow nudges — acts on the
+ * selection, and a selection could only be made by pointer, so the whole
+ * documented keyboard was unreachable without a mouse.
+ *
+ * Down and up move between things; left and right still nudge the thing, which
+ * is the axis each pair already belongs to. Nothing selected yet means start
+ * at the top (or the bottom, going up), and the ends hold rather than wrap —
+ * wrapping in a long plan loses the reader's place.
+ */
+function stepSelection(delta: 1 | -1) {
+  const items = chartItemsInReadingOrder();
+  if (items.length === 0) return;
+
+  const sel = useSelectionStore.getState();
+  const current = selectionSubjects(sel.items)[0];
+  const at = current ? items.findIndex((i) => i.id === current.id) : -1;
+
+  const next = at < 0 ? (delta === 1 ? 0 : items.length - 1) : Math.min(items.length - 1, Math.max(0, at + delta));
+  const pick = items[next];
+  if (!pick) return;
+
+  // Selecting by keyboard lights the gutter exactly as clicking does.
+  const doc = useDocumentStore.getState().doc;
+  const owner =
+    pick.kind === 'task' ? doc.tasks.find((t) => t.id === pick.id)?.rowId
+    : doc.milestones.find((m) => m.id === pick.id)?.rowId;
+  sel.setSelection([pick, ...(owner ? [{ kind: 'row' as const, id: owner, companionFor: pick.id }] : [])]);
+}
+
 function nudge(days: number) {
   const sel = useSelectionStore.getState();
   if (sel.items.length === 0) return;
@@ -288,16 +347,20 @@ export const KEYMAP: readonly Binding[] = [
     when: 'canvas',
     run: () => {
       const sel = useSelectionStore.getState();
-      if (sel.items.length !== 1) return;
+      // Was `sel.items.length !== 1`. Clicking a bar selects the bar AND its
+      // row, so the one gesture almost everybody uses gave this two items and
+      // the rename the shortcuts sheet advertises did nothing (SRS-EDIT-088).
+      const picked = selectionSubjects(sel.items);
+      if (picked.length !== 1) return;
       // Task and marker, because those are the two renderers that read
       // `editingTaskId` and can therefore put a field on screen (TaskBars,
       // Markers). The marker's own context menu has always advertised F2 next
       // to Rename and this refused it (SR-IXC-16). A milestone keeps its
       // editing flag locally on purpose and a row's name lives in the gutter,
       // so neither would render anything if this opened an editor for them.
-      const kind = sel.items[0].kind;
+      const kind = picked[0].kind;
       if (kind !== 'task' && kind !== 'marker') return;
-      useEditStore.getState().beginEdit(sel.items[0].id);
+      useEditStore.getState().beginEdit(picked[0].id);
     },
   },
   {
@@ -311,6 +374,22 @@ export const KEYMAP: readonly Binding[] = [
       if (!subject) return;
       useViewStore.getState().openDetails(subject);
     },
+  },
+  {
+    id: 'select-next',
+    chord: 'arrowdown',
+    label: 'Select the next thing in the chart',
+    group: 'Editing',
+    when: 'canvas',
+    run: () => stepSelection(1),
+  },
+  {
+    id: 'select-prev',
+    chord: 'arrowup',
+    label: 'Select the one before it',
+    group: 'Editing',
+    when: 'canvas',
+    run: () => stepSelection(-1),
   },
   { id: 'nudge-left', chord: 'arrowleft', label: 'Nudge back a day', group: 'Editing', when: 'canvas', run: () => nudge(-1) },
   { id: 'nudge-right', chord: 'arrowright', label: 'Nudge on a day', group: 'Editing', when: 'canvas', run: () => nudge(1) },

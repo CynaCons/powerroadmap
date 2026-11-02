@@ -239,6 +239,7 @@ export function Markers({ doc, viewStart, pxPerDay, chartHeight, bodyHeight, scr
                 (SRS-ELEM-051). */}
             <rect
               data-pp-kind="marker"
+              data-pp-selected={selected ? '1' : undefined}
               data-pp-id={m.id}
               x={x - 5}
               y={0}

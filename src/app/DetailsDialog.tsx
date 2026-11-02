@@ -1,8 +1,9 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { useDocumentStore } from '../stores/documentStore';
 import { useViewStore } from '../stores/viewStore';
+import { useDialogFocus } from './useDialogFocus';
 import { ColorPalette } from './ColorPalette';
 import { LabelPositionPicker } from './LabelPositionPicker';
 import type { LabelPlacement } from '../types/document';
@@ -31,6 +32,11 @@ export function DetailsDialog() {
     closeDetails();
   }, [closeDetails]);
   const doc = useDocumentStore((s) => s.doc);
+  // Focus belongs inside a modal while it is open, and goes back where it
+  // came from when it closes (SRS-LAY-058).
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
+
 
   useEffect(() => {
     if (!open) return;
@@ -95,6 +101,7 @@ export function DetailsDialog() {
   return createPortal(
     <div className="dialog-scrim" onMouseDown={close}>
       <div
+        ref={panelRef}
         className="dialog"
         role="dialog"
         aria-modal="true"

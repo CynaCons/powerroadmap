@@ -109,9 +109,12 @@ describe('a selected bar keeps its ends (SRS-EDIT-070)', () => {
     expect(num(end, 'x')).toBeLessThanOrEqual(bar.x + bar.width);
     expect(num(end, 'x') + num(end, 'width')).toBeGreaterThanOrEqual(bar.x + bar.width);
 
-    // And it is the full row band tall, because 11px of chrome is not 11px of
-    // target — the drawn grip is thinner than the thing you have to hit.
-    expect(num(start, 'height')).toBe(bar.height);
+    // And at least the full row band tall, because 11px of chrome is not 11px
+    // of target — the drawn grip is thinner than the thing you have to hit.
+    // At least 24, since SRS-EDIT-087: vertically nothing competes for the
+    // space, so there is no reason to be under the minimum.
+    expect(num(start, 'height')).toBeGreaterThanOrEqual(bar.height);
+    expect(num(start, 'height')).toBeGreaterThanOrEqual(24);
   });
 
   it('floats the dependency anchors clear of both grips', () => {
@@ -156,7 +159,18 @@ describe('a selected bar keeps its ends (SRS-EDIT-070)', () => {
     const grips = host.querySelectorAll('[data-pp-sub="start"],[data-pp-sub="end"]');
     const body = host.querySelector('.task-bar-body');
     expect(body, 'the body carries the rename double-click and must survive').not.toBeNull();
-    for (const g of grips) expect(num(g, 'width')).toBeLessThanOrEqual(layout.tasks[0].width - 8);
+
+    // What matters is how much of the BODY a grip covers, not how wide the
+    // grip is. Since SRS-EDIT-087 a grip also reaches outward, into space
+    // that was empty, so its total width is no longer a proxy for how much
+    // of the bar it eats — this asserts the thing the proxy stood for.
+    const bar = layout.tasks[0];
+    for (const g of grips) {
+      const left = num(g, 'x');
+      const right = left + num(g, 'width');
+      const insideBar = Math.max(0, Math.min(right, bar.x + bar.width) - Math.max(left, bar.x));
+      expect(insideBar, 'a grip is covering body the rename needs').toBeLessThanOrEqual(bar.width - 8);
+    }
   });
 });
 

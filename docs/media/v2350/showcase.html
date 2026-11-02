@@ -1,0 +1,738 @@
+<title>PowerRoadmap v2.35.0</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: one narrow column of records. Each states a defect, then shows the
+     evidence. The measurements are the page's recurring motif — this is an
+     engineering record, so the numbers carry it rather than ornament.
+     Colour and type come from the app's own tokens (src/styles/global.css). */
+  :root {
+    --ground: #FBFBFA;
+    --surface: #FFFFFF;
+    --rule: #D4D4CE;
+    --hair: rgba(0, 0, 0, 0.07);
+    --ink: #1C2430;
+    --ink-soft: #5A6472;
+    --ink-dim: #8A93A0;
+    --accent: #2F4369;
+    --accent-soft: rgba(47, 67, 105, 0.09);
+    --defect: #B3382C;
+    --defect-soft: rgba(179, 56, 44, 0.08);
+    --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #15181F;
+      --surface: #1C212B;
+      --rule: #333A47;
+      --hair: rgba(255, 255, 255, 0.08);
+      --ink: #E8EBF0;
+      --ink-soft: #A7AEBC;
+      --ink-dim: #767E8D;
+      --accent: #8FA6D4;
+      --accent-soft: rgba(143, 166, 212, 0.13);
+      --defect: #E2796C;
+      --defect-soft: rgba(226, 121, 108, 0.12);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #15181F;
+    --surface: #1C212B;
+    --rule: #333A47;
+    --hair: rgba(255, 255, 255, 0.08);
+    --ink: #E8EBF0;
+    --ink-soft: #A7AEBC;
+    --ink-dim: #767E8D;
+    --accent: #8FA6D4;
+    --accent-soft: rgba(143, 166, 212, 0.13);
+    --defect: #E2796C;
+    --defect-soft: rgba(226, 121, 108, 0.12);
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15.5px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 3.5rem 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 6vw, 2.9rem);
+    line-height: 1.08;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    line-height: 1.25;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  p { margin: 0; max-width: 62ch; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+
+  header .lede {
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    max-width: 58ch;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.4rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink-dim);
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--rule);
+  }
+  .meta b { color: var(--ink-soft); font-weight: 500; }
+
+  header { display: flex; flex-direction: column; gap: 1rem; }
+
+  .record {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    min-width: 0;
+  }
+  .record > .eyebrow { margin-bottom: -0.65rem; }
+
+  .defect {
+    border-left: 3px solid var(--defect);
+    background: var(--defect-soft);
+    padding: 0.85rem 1.1rem;
+    border-radius: 0 6px 6px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+  .defect h3 { color: var(--defect); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; font-family: var(--mono); font-weight: 600; }
+  .defect p { font-size: 0.95rem; color: var(--ink); }
+
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+  figure img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    border: 1px solid var(--rule);
+    border-radius: 7px;
+    background: var(--surface);
+  }
+  figcaption {
+    font-size: 0.82rem;
+    color: var(--ink-dim);
+    font-family: var(--mono);
+    line-height: 1.5;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  .trio {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  @media (max-width: 640px) {
+    .pair, .trio { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .measure {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 7px;
+    padding: 0.9rem 1.1rem;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+    overflow-x: auto;
+    font-variant-numeric: tabular-nums;
+  }
+  .measure b { color: var(--ink); font-weight: 600; }
+  .measure .arrow { color: var(--accent); }
+
+  .veto {
+    border: 1px dashed var(--rule);
+    border-radius: 7px;
+    padding: 0.9rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    background: var(--accent-soft);
+    min-width: 0;
+  }
+  .veto h3 { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+  .veto p { font-size: 0.92rem; }
+
+  .srs {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-dim);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    font-variant-numeric: tabular-nums;
+  }
+  th, td { text-align: left; padding: 0.5rem 0.7rem 0.5rem 0; border-bottom: 1px solid var(--hair); }
+  th { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); font-weight: 500; }
+  td.num { font-family: var(--mono); text-align: right; padding-right: 0; white-space: nowrap; }
+  .scroller { overflow-x: auto; min-width: 0; }
+
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">PowerRoadmap · release showcase</div>
+    <h1>v2.35.0</h1>
+    <p class="lede">
+      An independent round of polish, taken on while the owner was away. Nothing
+      here was reported: it was found by driving the app and measuring it — six
+      dimensions of behaviour against the running build, and the current
+      standards from the design systems the industry actually publishes. The
+      chart now answers a finger and a keyboard, its calendar reads as a
+      reference again, and five things that were quietly wrong are right.
+    </p>
+    <div class="meta">
+      <span><b>Iteration</b> v2.35.0</span>
+      <span><b>Fixed</b> 22</span>
+      <span><b>Found</b> 93, across six dimensions</span>
+      <span><b>Captured from</b> two servers, v2.34.2 and this tree</span>
+    </div>
+  </header>
+
+  <hr>
+
+  <!-- 1 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">The chart · the primary verb</div>
+    <h2>A bar resizes where the handle is shown</h2>
+
+    <div class="defect">
+      <h3>The defect</h3>
+      <p>
+        Hovering a bar drew a grip at each end, inviting you to take one — and
+        moving onto that grip made it vanish. The hover lived on the bar’s body
+        rect, and the grips, the progress handle and the anchors are
+        <em>siblings painted over it</em>, so touching any of them fired
+        <code>mouseleave</code> on the body. The bar stopped being active, the
+        grips stopped being drawn, and <code>data-pp-live</code> dropped — which
+        under SRS-EDIT-079 demotes a grip from rank 60 to rank 8 and hands the
+        press to the bar body underneath. The handle disappeared exactly as the
+        hand arrived, and the drag moved the task instead of resizing it. The
+        cursor said <code>ew-resize</code> the whole time.
+      </p>
+    </div>
+
+    <p>Walking the pointer from a bar’s middle out to its end, sampled per pixel:</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>offset from the end</th><th>grips drawn</th><th><code>pp-live</code></th><th>a press would</th></tr></thead>
+        <tbody>
+          <tr><td>−30px</td><td>2</td><td>null</td><td>move the bar</td></tr>
+          <tr><td>−10px</td><td><b>0</b></td><td>null</td><td>move the bar</td></tr>
+          <tr><td>−6px</td><td>2</td><td>1</td><td>set the progress</td></tr>
+          <tr><td>−3px … 0px</td><td><b>0</b></td><td>null</td><td><b>move the bar</b></td></tr>
+          <tr><td>+1px … +3px</td><td>0</td><td>null</td><td>resize</td></tr>
+          <tr><td>+4px</td><td>0</td><td>null</td><td><b>nothing at all</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      Hover belongs to the whole task, not to one rect inside it. On a
+      <code>&lt;g&gt;</code>, moving between children is not leaving. Four
+      approaches were then driven in from outside, along the bar and from
+      above; before the fix two of the four moved the task, and all four now
+      resize it. The resize band went from 3px to 7px, and the 4px of dead
+      space past each end is gone.
+    </p>
+
+    <div class="measure">
+      <span>press at the end, approached along the bar <span class="arrow">→</span> moved <b>121.2px</b>, width <b>+0</b></span>
+      <span>the same press, after <span class="arrow">→</span> moved <b>0px</b>, width <b>+121.3px</b></span>
+    </div>
+    <div class="srs">SRS-EDIT-084</div>
+  </section>
+
+  <!-- 2 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">The chart · input</div>
+    <h2>A bar moves under a finger</h2>
+
+    <div class="defect">
+      <h3>The defect</h3>
+      <p>
+        The drag loop was built on <code>mousedown</code> and a window
+        <code>mousemove</code> — fifteen such sites, and no
+        <code>pointerdown</code>, <code>setPointerCapture</code> or
+        <code>touch-action</code> anywhere in <code>src/</code>. A finger sends
+        none of those. The product ships into a Microsoft Office task pane and
+        onto tablets, and its primary verb did not answer one.
+      </p>
+    </div>
+
+    <div class="measure">
+      <span>ten touch moves across 120px, before <span class="arrow">→</span> the bar moved <b>0.0px</b></span>
+      <span>the same drag with a mouse, same browser context <span class="arrow">→</span> <b>122.6px</b></span>
+      <span>after <span class="arrow">→</span> touch <b>122.6px</b>, mouse <b>122.5px</b></span>
+    </div>
+
+    <p>
+      The handlers did not change — <code>PointerEvent</code> extends
+      <code>MouseEvent</code>, so every one reads the same
+      <code>clientX</code> it always did. Only the event names changed, plus
+      <code>touch-action: none</code> on the plot so the browser stops taking
+      the gesture for a scroll, and <code>pointercancel</code> so a drag the
+      system takes away does not hang with its listeners attached. The mouse
+      names are kept behind a feature test for environments with no
+      <code>PointerEvent</code> — which in practice means jsdom, where the unit
+      suite drives this same code.
+    </p>
+    <div class="srs">SRS-EDIT-085</div>
+  </section>
+
+  <!-- 3 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">Reach</div>
+    <h2>The chart takes focus, and the keyboard reaches what is in it</h2>
+
+    <div class="defect">
+      <h3>The defect</h3>
+      <p>
+        Forty-eight elements were focusable: six in the header, forty in the
+        side panel, and <b>none in the chart</b>. The chart’s
+        <code>&lt;svg&gt;</code> had no <code>role</code>, no
+        <code>aria-label</code> and no <code>tabindex</code>. Every editing
+        shortcut the app documents — F2 to rename, Del to delete, Enter for
+        details, the arrow nudges — acts on <em>the selection</em>, and a
+        selection could only be made with a pointer. So the whole documented
+        keyboard was unreachable without a mouse. The picture the app
+        <em>exports</em> already carried <code>role="img"</code>; the chart the
+        planner edits had no name at all.
+      </p>
+    </div>
+
+    <p>
+      The chart is one tab stop now, named from the document and its size, and
+      it comes before the side panel. Down and up move the selection through
+      the chart in reading order; left and right still nudge what is selected,
+      which is the axis each pair already belonged to. Escape clears. A polite
+      live region says what was picked and when it runs — eight of nine
+      ordinary actions used to announce nothing whatsoever.
+    </p>
+
+    <figure>
+      <img src="keyboard-after.png" alt="The chart with a focus ring and the first task selected by keyboard">
+      <figcaption>Tab into the chart, then ArrowDown. Neither was possible before.</figcaption>
+    </figure>
+    <div class="srs">SRS-EDIT-086</div>
+  </section>
+
+  <!-- 4 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">The chart · reading</div>
+    <h2>The calendar is a reference again, and a deadline is not today</h2>
+
+    <div class="defect">
+      <h3>The defect</h3>
+      <p>
+        Four things at once. <code>--color-today</code> and
+        <code>--color-deadline</code> were the same <code>#B3382C</code>, so the
+        line that says <em>now</em> and the lines that say <em>this is due</em>
+        differed only in that one was dashed — and a dash is the first thing a
+        print or an export loses. The default roadmap drew <b>91</b> vertical
+        rules <b>10.1px</b> apart, a texture rather than a reference, at
+        full ink. <code>--color-text-dim</code> carried real text at
+        <b>3.00:1</b> on the sheet and <b>2.77:1</b> on a subtle fill, under AA
+        in both themes. And a task at 0% painted <code>rgb(194,206,216)</code>
+        on a <code>rgb(251,251,250)</code> sheet — <b>1.55:1</b>, which reads as
+        disabled, and 0% is what the first bar anyone draws looks like.
+      </p>
+    </div>
+
+    <div class="pair">
+      <figure>
+        <img src="plot-light-before.png" alt="The plot before: dense dark grid, red dashed deadline">
+        <figcaption>v2.34.2</figcaption>
+      </figure>
+      <figure>
+        <img src="plot-light-after.png" alt="The plot after: faint grid, amber deadline, darker row names">
+        <figcaption>v2.35.0</figcaption>
+      </figure>
+    </div>
+    <div class="pair">
+      <figure>
+        <img src="plot-dark-before.png" alt="The plot in dark before">
+        <figcaption>v2.34.2, dark</figcaption>
+      </figure>
+      <figure>
+        <img src="plot-dark-after.png" alt="The plot in dark after">
+        <figcaption>v2.35.0, dark</figcaption>
+      </figure>
+    </div>
+
+    <p>
+      The <em>grain</em> of the grid is still the planner’s setting and still
+      never the zoom — two tests say so, and both still pass. What changed is
+      the <em>ink</em>: rules far enough apart to count are drawn at full
+      weight, and rules that crowd fade back. The deadline takes the amber the
+      print theme has used since it was designed; the screen themes simply
+      never followed. An empty bar gains a hairline in its own colour, because
+      weight alone cannot fix it — even a <em>solid</em> amber bar is about
+      2.9:1 on this sheet, and an edge works at any fill.
+    </p>
+
+    <div class="measure">
+      <span>text under AA, whole app, both themes <span class="arrow">→</span> <b>3</b> of 142, now <b>0</b></span>
+      <span>grid ink at a 10.1px pitch <span class="arrow">→</span> <b>0.33</b>, full weight above 28px</span>
+      <span>today vs deadline <span class="arrow">→</span> ΔE <b>0</b>, now <b>30.6</b> light / <b>38.2</b> dark</span>
+    </div>
+    <div class="srs">SRS-TAX-060 · SRS-THEME-006 · SRS-THEME-007 · SRS-ELEM-074</div>
+  </section>
+
+  <!-- 5 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">Speed</div>
+    <h2>A keystroke in the title no longer re-lays the whole chart</h2>
+
+    <div class="defect">
+      <h3>The defect</h3>
+      <p>
+        The layout memo was keyed on the whole document object. Typing one
+        character into the document <em>title</em> — which
+        <code>layoutDocument</code> never reads — re-laid-out every row, task,
+        milestone, bracket and dependency, recomputed the critical path, and
+        re-rendered 675 SVG nodes.
+      </p>
+    </div>
+
+    <p>
+      The memo now names the seven fields the engine actually reads, taken
+      from its source rather than guessed, and a test reads <em>both</em>
+      files and fails the moment they stop agreeing — narrowing a memo is the
+      kind of optimisation that goes stale in silence.
+    </p>
+
+    <div class="defect">
+      <h3>And the correction, which is the more useful half</h3>
+      <p>
+        I first measured this at <b>1,446ms</b> of blocked main thread for ten
+        keystrokes, and nearly shipped that as the headline. It was wrong:
+        that reading was taken while seven research agents were running. On a
+        quiet machine <em>both</em> builds report <b>0ms</b>, because 39 rows
+        is too little work to see at full speed.
+      </p>
+      <p>
+        Measured properly — both builds, alternating, under identical 6× CPU
+        throttling — narrowing the memo <em>on its own</em> changed nothing:
+        3,855ms against 3,749ms, indistinguishable. React re-renders a child
+        whenever its parent renders, whatever the props are, so the layout had
+        stopped being recomputed while the whole chart was still being
+        reconciled. The reconciliation was the cost. Memoising the five layers
+        that do not change while you type is what actually moved it.
+      </p>
+    </div>
+
+    <div class="measure">
+      <span>v2.34.2 <span class="arrow">→</span> median <b>4,114ms</b> (3,938–4,334, n=5)</span>
+      <span>v2.35.0 <span class="arrow">→</span> median <b>3,385ms</b> (3,181–3,430, n=5)</span>
+      <span>median change <span class="arrow">→</span> <b>−17.7%</b>, with no overlap between the ranges</span>
+    </div>
+
+    <div class="srs">SRS-LAY-057</div>
+  </section>
+
+  <!-- 6 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">Correctness</div>
+    <h2>One selection, counted once</h2>
+
+    <div class="defect">
+      <h3>The defect</h3>
+      <p>
+        Clicking a bar selects the bar <em>and</em> the row it sits on, so the
+        gutter lights up with it — one selection shown in two places. Four
+        files worked that out separately, each slightly differently, and the
+        places that never worked it out are where things broke. <b>F2</b>
+        asked for <code>items.length === 1</code>, and the gesture almost
+        everyone uses gives it two, so the rename printed in the shortcuts
+        sheet did nothing. The Selection panel counted the companion and
+        printed one more than the footer. The right-click <b>Delete</b> removed
+        one of four selected bars, posted no notice, and left the footer
+        reading “4 selected”. And <b>ctrl-click</b> could add a bar to a
+        selection but never take one out: the test was
+        <code>if (!isSelected(id)) add(…)</code>.
+      </p>
+    </div>
+
+    <p>
+      The companion is now recorded as one — <code>companionFor</code> — and a
+      single derivation, <code>selectionSubjects</code>, answers “what did the
+      planner actually pick”. Four ad-hoc versions deleted. Every kind of
+      element reports its own selected state in the DOM too; before, only task
+      bars did, so with a milestone selected the footer said “1 selected” and
+      nothing said which.
+    </p>
+    <div class="srs">SRS-EDIT-088</div>
+  </section>
+
+  <!-- 7 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">Correctness · the document</div>
+    <h2>Deleting a row takes its dependencies with it</h2>
+
+    <div class="defect">
+      <h3>The defect</h3>
+      <p>
+        <code>deleteRow</code> hand-rolled its cascade and dropped the row, its
+        tasks and its milestones — but not the dependencies those tasks were
+        part of. Deleting a row from the context menu left records pointing at
+        tasks that no longer existed, and the file carried them. The
+        <code>delete_row</code> op the agent bridge uses has done it correctly
+        all along, two lines below a comment saying that a user action and an
+        agent action must not diverge.
+      </p>
+    </div>
+
+    <div class="measure">
+      <span>delete a row with a dependency on it <span class="arrow">→</span> tasks 33 <span class="arrow">→</span> 32, <b>dangling records kept</b></span>
+      <span>after <span class="arrow">→</span> byte-identical to what the bridge produces</span>
+    </div>
+    <div class="srs">SRS-ABR-019</div>
+  </section>
+
+  <!-- 8 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">Keyboard</div>
+    <h2>Enter presses the button you tabbed to</h2>
+
+    <div class="defect">
+      <h3>The defect</h3>
+      <p>
+        Enter is bound to “open details”, and the global key handler resolved
+        it and called <code>preventDefault()</code> — so the browser never
+        activated the button the user had tabbed to. Measured on three of them:
+        Enter fired <b>zero</b> click events, and the keydown came back
+        <code>defaultPrevented: true</code>. A keyboard user could reach every
+        control in the chrome and press none of them.
+      </p>
+    </div>
+
+    <div class="measure">
+      <span>Enter on a focused button, before <span class="arrow">→</span> <b>0 of 3</b> fired</span>
+      <span>after <span class="arrow">→</span> <b>3 of 3</b>, and Enter on the canvas still opens Details</span>
+    </div>
+    <div class="srs">SRS-EDIT-089</div>
+  </section>
+
+  <!-- 9 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">Targets, feedback and motion</div>
+    <h2>Four smaller things that were missing entirely</h2>
+
+    <div class="trio">
+      <div>
+        <h4>Nothing was big enough to hit</h4>
+        <p>
+          WCAG 2.2 SC 2.5.8 asks for 24px, and these sit against each other so
+          the Spacing exception does not apply. A grip was hit over 7×22, the
+          progress handle 10×22, and the dependency anchor 10×10 with
+          <em>no</em> enlarged area at all. Widening a grip inward would eat
+          the body that carries the rename, so they reach <em>outward</em>
+          instead, into space that was empty — and that also closes the 4px
+          band past each end where nothing answered a press.
+        </p>
+        <div class="measure"><span>grips <b>7×22 → 16×24</b> · handle <b>10×22 → 16×24</b> · anchors <b>10×10 → 24×24</b></span></div>
+      </div>
+      <div>
+        <h4>Hovering painted the colour already there</h4>
+        <p>
+          The header’s background <em>is</em> <code>--color-bg-panel</code>,
+          and the button hover painted <code>--color-bg-panel</code>. White on
+          white: 25 of 48 controls repainted zero pixels. Milestones, markers
+          and rows had no hover state at all.
+        </p>
+        <div class="measure"><span>milestone <b>0 → 354</b> px changed · row <b>0 → 1,923</b></span></div>
+      </div>
+      <div>
+        <h4>Modals never took focus</h4>
+        <p>
+          Opening the shortcuts sheet left <code>activeElement</code> on BODY,
+          and ten Tab presses put focus outside the dialog ten times out of
+          ten — on chrome under a scrim. The command palette has always done
+          this correctly; that behaviour is now shared so the others cannot
+          drift from it.
+        </p>
+        <div class="measure"><span>escapes per 10 Tabs <b>10 → 0</b>, both dialogs</span></div>
+      </div>
+      <div>
+        <h4>Reduced motion stopped one dot</h4>
+        <p>
+          The whole <code>prefers-reduced-motion</code> block was one selector,
+          while 113 elements kept 26,530ms of declared transition between them.
+          Panning a large object is the trigger the guidance names first. What
+          moves is now stopped; the cross-fades that carry meaning stay, because
+          the rule is remove, reduce <em>or replace</em>.
+        </p>
+        <div class="measure"><span>non-fade transitions under <code>reduce</code> <b>→ 0</b></span></div>
+      </div>
+    </div>
+    <div class="srs">SRS-EDIT-087 · SRS-THEME-008 · SRS-THEME-009 · SRS-LAY-055 · SRS-LAY-056 · SRS-ABR-063</div>
+  </section>
+
+  <hr>
+
+  <!-- VETO --------------------------------------------------------------- -->
+  <section class="record">
+    <h2>Decisions you might want to veto</h2>
+    <div class="veto">
+      <p>
+        <b>A deadline is amber now.</b> It was the same red as TODAY in every
+        screen theme. The amber is the one the print theme already used. If you
+        want the deadline to stay red, the two still need to differ some other
+        way than a dash.
+      </p>
+      <p>
+        <b>The grid fades instead of thinning.</b> I tried two other answers
+        first and backed out of both: deriving the default grain from the
+        document’s scale also moves every mark that anchors to “its column”,
+        and simply refusing to draw a crowded grid broke “the plot has vertical
+        rules out of the box”. Fading the ink keeps the grain you chose, keeps
+        the rules present, and moves nothing.
+      </p>
+      <p>
+        <b>Arrow up and down now move the selection.</b> They were unbound.
+        Left and right still nudge. If you would rather up and down carried a
+        bar to the row above or below, say so — that is the other reasonable
+        reading, and it would need a different key for navigation.
+      </p>
+      <p>
+        <b>An empty bar has a hairline.</b> Every bar does, in its own colour.
+        It is what makes a 0% task visible, but it is a change to how every
+        chart looks.
+      </p>
+      <p>
+        <b>The keyboard-shortcuts button is gone below 560px</b> — that shipped
+        in v2.34.2 and is unchanged here; noted because it is the one control
+        the phone header gives up.
+      </p>
+    </div>
+  </section>
+
+  <!-- NOT FIXED ---------------------------------------------------------- -->
+  <section class="record">
+    <h2>Found and not fixed</h2>
+    <p>
+      Ninety-three defects were found across six measured dimensions — and sixty-four behaviours were checked and found genuinely sound, which is worth saying too. Twenty-two of the defects are fixed here. The rest are in
+      the backlog, measured, with the worst first. These three are data-loss or
+      dead-end bugs and deserve a release of their own:
+    </p>
+    <ul>
+      <li>
+        <b>Saving a plan you opened from <code>.json</code> or <code>.yaml</code>
+        rewrites it as HTML under its original name</b> — and the app can then
+        never read it again. 604 bytes of JSON came back as a 420KB HTML file
+        still called <code>sprint.json</code>.
+      </li>
+      <li>
+        <b>A date with the right shape but no such day wedges the chart.</b>
+        <code>isISODate</code> is a shape test, so <code>2026-13-45</code> loads
+        and the viewport goes to NaN: no axis, no bars, nothing to click.
+      </li>
+      <li>
+        <b>Printing a normal plan silently drops most of it.</b> 22 of 39 rows
+        and 18 of 33 bars reached the page, with no indication that the rest
+        exist — on a product whose promise is charts you can present.
+      </li>
+    </ul>
+    <p>
+      Also waiting: the restore banner returns on every load even on a fresh
+      profile; <code>apply_batch</code> accepts documents the loader then
+      refuses to open; the context menu is a <code>role="menu"</code> with no
+      menu keyboard behaviour; the stylesheet has no <code>:active</code> rule
+      at all; and a dependency cycle silently empties the critical path.
+    </p>
+  </section>
+
+  <!-- VERIFICATION ------------------------------------------------------- -->
+  <section class="record">
+    <h2>Verification</h2>
+    <p>
+      Real numbers, including the failures and the flakes. Every “before” here
+      was captured from a git worktree at <code>145565f</code> served on a
+      second port — not illustrated, not remembered.
+    </p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Gate</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td><code>tsc -b</code></td><td>clean</td></tr>
+          <tr><td><code>npm run lint</code></td><td>0 errors, 18 warnings (the pre-existing baseline)</td></tr>
+          <tr><td><code>npm test</code></td><td>476 passed, 0 failed, across 60 files (17 of them new or rewritten here)</td></tr>
+          <tr><td><code>npm run test:e2e</code></td><td>303 passed, 1 failed, 239 skipped, across 543 tests and three projects (desktop, iPad/WebKit, iPhone)</td></tr>
+          <tr><td><code>npm run build:template</code></td><td>PowerRoadmap.html, 427.60 kB (gzip 126.96 kB) — up 6.1 kB on v2.34.2</td></tr>
+          <tr><td>the built file, opened from disk</td><td>14 of 14 claims verified, including the version in the bytes</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="num">The one failure was the dark-theme panel-contrast assertion, early in the run. It did not reproduce: the same check run again on a settled server reports the worst panel label at 6.83:1 in dark and 5.35:1 in light, against a 4.5:1 threshold, and the built file measures 0 of 134 text runs under AA in both themes. Recorded as unreproducible rather than explained away. Separately, one tablet dependency test flaked once in roughly fifty runs and the previous build passed the same spec 20 of 20, so it is not attributed to this change; both are in the backlog. The suite also spends five to ten minutes in teardown after the last test finishes — 20 runs of one spec take 19.3s without the config's webServer block and 10.3m with it, which is the cause and is now recorded.</p>
+  </section>
+
+  <footer>
+    <p>
+      PowerRoadmap v2.35.0 · captured from the running build, light and dark ·
+      the measurements in this page are the ones the gates run.
+    </p>
+  </footer>
+</div>
+

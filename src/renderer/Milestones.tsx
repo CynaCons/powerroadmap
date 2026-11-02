@@ -98,6 +98,7 @@ export function Milestones({ layout, dragPreview }: Props) {
           <g key={m.id}>
             <polygon
               data-pp-kind="milestone"
+              data-pp-selected={selected ? '1' : undefined}
               data-pp-id={m.id}
               // The row it is on, as a task bar has carried all along. A
               // milestone's row is not readable from its y: when it leaves a

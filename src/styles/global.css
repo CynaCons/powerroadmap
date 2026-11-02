@@ -11,7 +11,14 @@
   --color-border-hairline: rgba(0, 0, 0, 0.06);
   --color-text: #1C2430;
   --color-text-soft: #5A6472;
-  --color-text-dim: #8A93A0;
+  /* This token carries real text — the 10px popover field labels, the dialog
+     choice descriptions, the settings facts, the status-bar version and the
+     panel's group labels — so it has to clear WCAG AA for small text, not
+     merely look secondary. #8A93A0 measured 3.00:1 on the sheet, 3.11:1 on
+     the panel and 2.77:1 on a subtle fill; this clears 4.5:1 on all three
+     (SRS-THEME-006). `--color-text-mute` stays decorative and is not for
+     text. */
+  --color-text-dim: #656D7A;
   --color-text-mute: #B2B9C2;
 
   /* Brand & semantic */
@@ -19,7 +26,11 @@
   --color-accent-strong: #22304D;
   --color-accent-soft: rgba(47, 67, 105, 0.10);
   --color-today: #B3382C;
-  --color-deadline: #B3382C;
+  /* Not the TODAY red. The two lines mean different things and the dash was
+     the only thing saying so — and a dash is the first thing a print or an
+     export loses (SRS-THEME-007). The print theme has distinguished them
+     since it was designed; the screen themes now follow it. */
+  --color-deadline: #A2601A;
   --color-weekend: rgba(0, 0, 0, 0.025);
   --color-success: #34d399;
   --color-overlay-scrim: rgba(15, 23, 42, 0.32);
@@ -89,7 +100,8 @@
   --bar-fill-a: 0.44;
   --bar-stroke-a: 0.60;
   /* Weight of the not-yet-done part of a bar. */
-  --bar-track-a: 0.26;
+  --bar-track-a: 0.32;
+  --bar-edge-a: 0.55;
 }
 
 [data-theme='light'] {
@@ -102,13 +114,24 @@
   --color-border-hairline: rgba(0, 0, 0, 0.06);
   --color-text: #1C2430;
   --color-text-soft: #5A6472;
-  --color-text-dim: #8A93A0;
+  /* This token carries real text — the 10px popover field labels, the dialog
+     choice descriptions, the settings facts, the status-bar version and the
+     panel's group labels — so it has to clear WCAG AA for small text, not
+     merely look secondary. #8A93A0 measured 3.00:1 on the sheet, 3.11:1 on
+     the panel and 2.77:1 on a subtle fill; this clears 4.5:1 on all three
+     (SRS-THEME-006). `--color-text-mute` stays decorative and is not for
+     text. */
+  --color-text-dim: #656D7A;
   --color-text-mute: #B2B9C2;
   --color-accent: #2F4369;
   --color-accent-strong: #22304D;
   --color-accent-soft: rgba(47, 67, 105, 0.10);
   --color-today: #B3382C;
-  --color-deadline: #B3382C;
+  /* Not the TODAY red. The two lines mean different things and the dash was
+     the only thing saying so — and a dash is the first thing a print or an
+     export loses (SRS-THEME-007). The print theme has distinguished them
+     since it was designed; the screen themes now follow it. */
+  --color-deadline: #A2601A;
   --color-weekend: rgba(0, 0, 0, 0.025);
   --color-success: #34d399;
   --color-overlay-scrim: rgba(15, 23, 42, 0.32);
@@ -131,7 +154,8 @@
   --bar-tint-a: 0.16;
   --bar-fill-a: 0.44;
   --bar-stroke-a: 0.60;
-  --bar-track-a: 0.26;
+  --bar-track-a: 0.32;
+  --bar-edge-a: 0.55;
 }
 
 [data-theme='dark'] {
@@ -144,13 +168,15 @@
   --color-border-hairline: rgba(255, 255, 255, 0.06);
   --color-text: #E9EBEE;
   --color-text-soft: #a1a5ad;
-  --color-text-dim: #6b7079;
+  /* See the light theme: this tier carries small text and must clear AA. */
+  --color-text-dim: #878D97;
   --color-text-mute: #4b5057;
   --color-accent: #7E9BC9;
   --color-accent-strong: #5B7CAD;
   --color-accent-soft: rgba(126, 155, 201, 0.16);
   --color-today: #E0564A;
-  --color-deadline: #E0564A;
+  /* See the light theme: a deadline is amber, not the TODAY red. */
+  --color-deadline: #D08A3A;
   --color-weekend: rgba(255, 255, 255, 0.025);
   --color-success: #34d399;
   --color-overlay-scrim: rgba(0, 0, 0, 0.45);
@@ -167,7 +193,8 @@
   --bar-tint-a: 0.30;
   --bar-fill-a: 0.62;
   --bar-stroke-a: 0.75;
-  --bar-track-a: 0.34;
+  --bar-track-a: 0.40;
+  --bar-edge-a: 0.62;
 }
 
 [data-theme='print'] {
@@ -195,7 +222,8 @@
   --bar-tint-a: 0.14;
   --bar-fill-a: 0.40;
   --bar-stroke-a: 0.85;
-  --bar-track-a: 0.22;
+  --bar-track-a: 0.26;
+  --bar-edge-a: 0.70;
 }
 
 * { box-sizing: border-box; }
@@ -418,8 +446,17 @@ kbd {
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease;
 }
+/* The header's own background IS `--color-bg-panel`, so hovering painted the
+   colour already under the pointer: 25 of 48 controls repainted zero pixels.
+   A hover has to differ from the surface it sits on, and these buttons sit on
+   two different ones (SRS-THEME-009). */
 .app-header__btn:hover:not(:disabled) {
   color: var(--color-text);
+  background: var(--color-bg-subtle);
+}
+/* Inside a cluster the surface is already `subtle`, so this one goes the
+   other way. */
+.app-header__cluster .app-header__btn:hover:not(:disabled) {
   background: var(--color-bg-panel);
 }
 .app-header__btn:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -458,6 +495,11 @@ kbd {
   position: relative;
   overflow: hidden;
   background: var(--color-bg);
+  /* The browser must not take the gesture for a pan or a pinch: on a touch
+     screen a drag along a bar is the primary verb, not a scroll
+     (SRS-EDIT-085). Without this the first `pointermove` is followed by a
+     `pointercancel` and the bar never moves. */
+  touch-action: none;
 }
 
 /* ------------------------------------------------------------------
@@ -641,7 +683,12 @@ kbd {
   border: none;
   border-radius: 4px;
   color: var(--color-text-soft);
-  min-width: 22px;
+  /* 24px, because these sit against each other and the WCAG 2.2 Spacing
+     exception therefore does not apply (SRS-EDIT-087). They measured about
+     21px tall with 2px between them. The TYPE is unchanged — this is the
+     target, not the label. */
+  min-width: 24px;
+  min-height: 24px;
 }
 .cmdbar__scale button.is-active {
   background: var(--color-bg-panel);
@@ -788,8 +835,38 @@ kbd {
   50% { opacity: 0.35; }
 }
 
+/**
+ * Reduced motion, honoured across the app (SRS-THEME-008).
+ *
+ * This block used to be one selector, stopping one indicator dot, while 113
+ * elements kept 26,530ms of declared transition between them: section
+ * collapse, dialog and palette entry, the chart's own hover and the camera
+ * move on a scale change all still played. Panning a large object is the
+ * trigger the guidance names first.
+ *
+ * The rule is "remove, reduce, OR REPLACE", so this does not flatten
+ * everything: anything that moves or scales is stopped, and the cross-fades
+ * that carry meaning — a colour, an opacity, a state change — are kept, which
+ * is what stops the UI reading as broken rather than calm.
+ */
 @media (prefers-reduced-motion: reduce) {
   .agent-indicator-dot { animation: none; }
+
+  /* Nothing travels, grows or spins. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-property: opacity, color, background-color, fill, stroke, border-color, box-shadow, outline-color !important;
+    transition-duration: 120ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* The chevron on a section head is the one transform worth keeping, and it
+     is a rotation of an 8px glyph — but it goes too, because the open state
+     is already carried by the body appearing. */
+  .cmdbar__chev { transition: none !important; }
 }
 
 /* What the app has just done (SRS-PERS-025).
@@ -1318,3 +1395,66 @@ kbd {
 /* Same ink as the drag date pill: one readout idiom for the whole surface. */
 .bar-progress-pill { fill: var(--color-text); }
 .bar-progress-pill-text { fill: var(--color-bg); }
+
+/* Said, not drawn: for live regions whose text is only ever announced. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The chart is a tab stop now (SRS-EDIT-086), so it needs a ring of its own.
+   Inset, because an outline outside the SVG would be clipped by the shell. */
+.chart-area > svg:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+/**
+ * A scrolling region that says so, at the edge where there is more
+ * (SRS-LAY-055).
+ *
+ * The classic four-layer trick, and the reason it is worth the four layers:
+ * the two `local` gradients scroll WITH the content and so cover the shadows
+ * at the very top and the very bottom, while the two `scroll` shadows stay
+ * put. The cue therefore appears only when there is something out of sight
+ * and disappears when you reach the end — no JavaScript, and no false fade on
+ * a panel whose content happens to fit.
+ */
+.scroll-shadows {
+  background:
+    linear-gradient(var(--color-bg-elev) 30%, rgba(0, 0, 0, 0)) top / 100% 28px no-repeat local,
+    linear-gradient(rgba(0, 0, 0, 0), var(--color-bg-elev) 70%) bottom / 100% 28px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, rgba(15, 23, 42, 0.16), rgba(0, 0, 0, 0)) top / 100% 12px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, rgba(15, 23, 42, 0.16), rgba(0, 0, 0, 0)) bottom / 100% 12px no-repeat scroll;
+  background-color: var(--color-bg-elev);
+}
+
+/**
+ * The chart answers the pointer too (SRS-THEME-009).
+ *
+ * A bar brightened on hover and showed its grips; a milestone, a marker and a
+ * row did nothing at all — measured as a 0-pixel repaint with the pointer
+ * verified over the element. Nothing said they could be clicked, which is the
+ * whole job of a hover state. CSS reaches SVG, so this costs no renderer
+ * state and nothing re-renders to show it.
+ */
+g[data-pp-kind='row']:hover > rect:first-of-type {
+  fill: var(--color-bg-subtle);
+}
+/* The attribute sits on the shape itself, not on a wrapper: a milestone IS a
+   polygon and a marker IS its transparent hit rect. */
+polygon[data-pp-kind='milestone']:hover {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+rect[data-pp-kind='marker']:hover {
+  fill: var(--color-accent);
+  fill-opacity: 0.14;
+}

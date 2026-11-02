@@ -29,6 +29,10 @@ const GRIP_W = 7;
 const ANCHOR_LEAD = 16;
 /** Radius of that anchor. `ANCHOR_LEAD - r` is its clearance from the grip. */
 const ANCHOR_R = 5;
+/** How far a grip's hit area reaches past the bar's end, stopping short of
+ *  the dependency anchor at `ANCHOR_LEAD - ANCHOR_R` (SRS-EDIT-087). */
+const GRIP_REACH = ANCHOR_LEAD - ANCHOR_R - 2;
+
 /** Drawn width of the progress handle; its hit target is wider. */
 const PROGRESS_HANDLE_W = 8;
 /** Drawn height of a task bar. Smaller than the row band it is hit-tested in. */
@@ -152,10 +156,48 @@ export function TaskBars({ layout, dragPreview }: Props) {
         // (SRS-EDIT-078). It was a hard 10px, which on a one-week bar at the
         // opening zoom — 15px — covered every pixel of body the grips had left,
         // so the double-click that renames a task had nowhere to land.
-        const progW = Math.max(4, Math.min(10, width - 2 * gripW));
+        // The 10px cap was what bound this on any ordinary bar, not the bar
+        // itself — a 117px bar can spare far more. Raised to 16, still inside
+        // the same body budget the grips observe (SRS-EDIT-078, SRS-EDIT-087).
+        const progW = Math.max(4, Math.min(16, width - 2 * gripW));
+
+        /**
+         * The grips reach OUTWARD for their target size (SRS-EDIT-087).
+         *
+         * WCAG 2.2 SC 2.5.8 asks for 24px and a grip was hit over 7x22, but
+         * widening it inward is not available: the body has to keep room for
+         * the double-click that renames the task, which is why `gripW` is
+         * clamped to the bar's own width in the first place. Outward costs
+         * nothing — it was empty, and in fact there was a 4px band past each
+         * end where NOTHING answered a press at all. `ANCHOR_LEAD - ANCHOR_R`
+         * is where the dependency anchor begins, so the reach stops short of
+         * it rather than stealing its presses.
+         */
+        const gripHitH = Math.max(h, 24);
+        const gripHitY = y + (h - gripHitH) / 2;
 
         return (
-          <g key={t.id}>
+          /*
+           * Hover belongs to the WHOLE task, not to its body rect
+           * (SRS-EDIT-084).
+           *
+           * It used to sit on the body, and the grips, the progress handle and
+           * the anchors are siblings painted over it — so moving onto any of
+           * them fired `mouseleave` on the body, `active` went false, the
+           * grips stopped being drawn and `data-pp-live` dropped, which under
+           * SRS-EDIT-079 demotes a grip from rank 60 to rank 8 and hands the
+           * press to the bar body. Walked pixel by pixel from a bar's middle
+           * to its end: grips at -30px, gone at -10px, back at -6px, gone from
+           * -3px on; a press at -1px MOVED the task 121.2px instead of
+           * resizing it. The handles went away exactly as the hand arrived.
+           *
+           * On a `<g>`, moving between children is not leaving.
+           */
+          <g
+            key={t.id}
+            onMouseEnter={() => setHoverId(t.id)}
+            onMouseLeave={() => setHoverId((cur) => (cur === t.id ? null : cur))}
+          >
             {/* Critical path glow */}
             {critical && (
               <rect
@@ -194,20 +236,27 @@ export function TaskBars({ layout, dragPreview }: Props) {
               fill="transparent"
               style={{ cursor: 'move' }}
               onDoubleClick={() => beginEdit(t.id)}
-              onMouseEnter={() => setHoverId(t.id)}
-              onMouseLeave={() => setHoverId((cur) => (cur === t.id ? null : cur))}
             />
             {/* The drawn bar (direction B, owner's choice 2026-10-23): a thin
                 solid span. Remaining work is the same hue held back, completed
                 work is solid, and the label sits outside — which is what lets
                 the bar stay this quiet without losing its reading. */}
+            {/* The empty part of a bar carries its own hairline, in its own
+                colour (SRS-ELEM-074). Held back to `--bar-track-a` and nothing
+                else, a task at 0% painted rgb(194,206,216) on a rgb(251,251,250)
+                sheet — 1.55:1, which reads as disabled, and 0% is what the
+                first bar anyone draws looks like. Weight alone cannot fix it:
+                even a SOLID amber bar is about 2.9:1 on this sheet. An edge
+                can, at any fill. */}
             <rect
-              x={x}
-              y={barTop}
-              width={width}
-              height={BAR_DRAWN_H}
+              x={x + 0.5}
+              y={barTop + 0.5}
+              width={Math.max(0, width - 1)}
+              height={BAR_DRAWN_H - 1}
               fill={color}
-              style={{ fillOpacity: 'var(--bar-track-a)' }}
+              stroke={color}
+              strokeWidth={1}
+              style={{ fillOpacity: 'var(--bar-track-a)', strokeOpacity: 'var(--bar-edge-a)' }}
               pointerEvents="none"
             />
             {pct > 0 && (
@@ -276,9 +325,9 @@ export function TaskBars({ layout, dragPreview }: Props) {
                   data-pp-sub="progress"
                   data-pp-live="1"
                   x={handleX - progW / 2}
-                  y={y}
+                  y={gripHitY}
                   width={progW}
-                  height={h}
+                  height={gripHitH}
                   fill="transparent"
                   style={{ cursor: 'ew-resize' }}
                   onDoubleClick={() => beginEdit(t.id)}
@@ -324,10 +373,10 @@ export function TaskBars({ layout, dragPreview }: Props) {
                   data-pp-id={t.id}
                   data-pp-sub="start"
                   data-pp-live={active ? '1' : undefined}
-                  x={x - gripW / 2}
-                  y={y}
-                  width={gripW}
-                  height={h}
+                  x={x - gripW / 2 - GRIP_REACH}
+                  y={gripHitY}
+                  width={gripW + GRIP_REACH}
+                  height={gripHitH}
                   fill="transparent"
                   style={{ cursor: 'ew-resize' }}
                   onDoubleClick={() => beginEdit(t.id)}
@@ -338,9 +387,9 @@ export function TaskBars({ layout, dragPreview }: Props) {
                   data-pp-sub="end"
                   data-pp-live={active ? '1' : undefined}
                   x={x + width - gripW / 2}
-                  y={y}
-                  width={gripW}
-                  height={h}
+                  y={gripHitY}
+                  width={gripW + GRIP_REACH}
+                  height={gripHitH}
                   fill="transparent"
                   style={{ cursor: 'ew-resize' }}
                   onDoubleClick={() => beginEdit(t.id)}
@@ -391,25 +440,45 @@ export function TaskBars({ layout, dragPreview }: Props) {
                   y2={y + h / 2}
                   pointerEvents="none"
                 />
+                {/* The disc is 10px and stays 10px; the target around it is
+                    24px (SRS-EDIT-087). This was the only handle in the chart
+                    with no enlarged hit area at all. */}
                 <circle
-                  className="bar-anchor"
                   data-pp-kind="connector"
                   data-pp-id={t.id}
                   data-pp-sub="start"
                   cx={x - ANCHOR_LEAD}
                   cy={y + h / 2}
-                  r={ANCHOR_R}
+                  r={12}
+                  fill="transparent"
                   style={{ cursor: 'crosshair' }}
                 />
                 <circle
                   className="bar-anchor"
+                  cx={x - ANCHOR_LEAD}
+                  cy={y + h / 2}
+                  r={ANCHOR_R}
+                  pointerEvents="none"
+                />
+                {/* The disc is 10px and stays 10px; the target around it is
+                    24px (SRS-EDIT-087). This was the only handle in the chart
+                    with no enlarged hit area at all. */}
+                <circle
                   data-pp-kind="connector"
                   data-pp-id={t.id}
                   data-pp-sub="end"
                   cx={x + width + ANCHOR_LEAD}
                   cy={y + h / 2}
-                  r={ANCHOR_R}
+                  r={12}
+                  fill="transparent"
                   style={{ cursor: 'crosshair' }}
+                />
+                <circle
+                  className="bar-anchor"
+                  cx={x + width + ANCHOR_LEAD}
+                  cy={y + h / 2}
+                  r={ANCHOR_R}
+                  pointerEvents="none"
                 />
               </>
             )}

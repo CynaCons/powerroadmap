@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChartArea } from './ChartArea';
 import { Header } from './Header';
 import { StatusBar } from './StatusBar';
+import { SelectionAnnouncer } from './SelectionAnnouncer';
 import { RestoreBanner } from './RestoreBanner';
 import { CommandBar } from './CommandBar';
 import { ChartContextMenu } from './ChartContextMenu';
@@ -113,6 +114,9 @@ export function App({ compact = false }: AppProps) {
       <ChartArea />
       <CommandBar />
       <StatusBar />
+      {/* Quiet, polite, and drawn nowhere: what is selected, for anyone who
+          cannot see the chrome that shows it (SRS-EDIT-086). */}
+      <SelectionAnnouncer />
       {pendingRestore && (
         <RestoreBanner
           onRestore={() => {

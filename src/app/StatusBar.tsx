@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useDocumentStore, useIsDirty } from '../stores/documentStore';
 import { useViewportStore } from '../stores/viewportStore';
-import { useSelectionStore } from '../stores/selectionStore';
+import { useSelectionStore, selectionSubjects } from '../stores/selectionStore';
 import { saveStateLabel, useFileStore } from '../stores/fileStore';
 import { computeDocStats } from '../utils/docStats';
 import { APP_VERSION } from '../version';
@@ -55,9 +55,7 @@ export function StatusBar() {
   // Selecting a bar also selects the row it sits on, so the gutter highlights
   // with it. That companion row is not a second thing the user picked, so it
   // is not counted here.
-  const selectedCount = selection.some((i) => i.kind !== 'row')
-    ? selection.filter((i) => i.kind !== 'row').length
-    : selection.length;
+  const selectedCount = selectionSubjects(selection).length;
 
   // Absorbed from the inspector's Statistics section (PLAN.md v2.13.0 / C0a) —
   // read-only telemetry belongs in the status bar, not in a 320px column.

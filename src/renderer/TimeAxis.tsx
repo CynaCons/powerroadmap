@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import type { AxisLayout } from '../layout/timeAxis';
 import type { ISODate, TimeScale } from '../types/document';
 import { isoWeekNumber, parseISO } from '../utils/dates';
@@ -17,7 +18,7 @@ interface Props {
  * measured ticks. Everything else in the chart stays quiet so this can carry.
  * (PLAN.md v2.16 — owner report 2026-10-23.)
  */
-export function TimeAxis({ axis }: Props) {
+function TimeAxisInner({ axis }: Props) {
   const majorH = axis.major.height;
   const minorH = axis.minor.height;
   const microH = axis.micro?.height ?? 0;
@@ -157,3 +158,15 @@ export function DragDatePill({ pill, minX, maxX }: { pill: DragPill; minX: numbe
     </g>
   );
 }
+
+/**
+ * Memoised because nothing here changes while a bar is dragged or a title is
+ * typed (SRS-LAY-057).
+ *
+ * React re-renders a child whenever its parent renders, whatever the props
+ * are, so narrowing the layout memo stopped the layout being RECOMPUTED but
+ * not the whole chart being reconciled. Measured at 6x CPU throttle, ten
+ * keystrokes in the title cost 3,855ms before and 3,749ms after that change
+ * alone — indistinguishable. The reconciliation was the cost.
+ */
+export const TimeAxis = memo(TimeAxisInner);

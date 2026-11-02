@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { APP_VERSION } from '../version';
@@ -6,6 +6,7 @@ import { useDocumentStore } from '../stores/documentStore';
 import { checkForUpdate, performUpdate, type UpdateInfo } from '../utils/updateChecker';
 import { getCurrentHandle } from '../persistence/fileIo';
 import { notify } from '../stores/noticeStore';
+import { useDialogFocus } from './useDialogFocus';
 
 type Status =
   | 'idle'
@@ -83,9 +84,15 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
     }
   };
 
+  // Focus belongs inside a modal while it is open, and goes back where it
+  // came from when it closes (SRS-LAY-058).
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(panelRef);
+
   return createPortal(
     <div className="settings-scrim" role="presentation" onClick={onClose}>
       <div
+        ref={panelRef}
         className="settings-dialog"
         role="dialog"
         aria-modal="true"

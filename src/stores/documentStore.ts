@@ -271,13 +271,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     }),
   updateRow: (id, patch, key) =>
     mutate(set, (d) => ({ ...d, rows: d.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)) }), 'user', key),
-  deleteRow: (id) =>
-    mutate(set, (d) => ({
-      ...d,
-      rows: d.rows.filter((r) => r.id !== id),
-      tasks: d.tasks.filter((t) => t.rowId !== id),
-      milestones: d.milestones.filter((m) => m.rowId !== id),
-    })),
+  // Through the op reducer, like its neighbours below. It used to hand-roll
+  // the cascade and drop the row, its tasks and its milestones but not the
+  // dependencies those tasks were part of — so deleting a row from the
+  // context menu left records pointing at tasks that no longer existed, while
+  // the same deletion over the bridge did not (SRS-ABR-019).
+  deleteRow: (id) => mutate(set, (d) => applyOps(d, [{ op: 'delete_row', id }])),
 
   // Order, sections and the calendar go through the same op reducer the bridge
   // uses, so a user action and an agent action cannot diverge (SRS-ABR-019).
