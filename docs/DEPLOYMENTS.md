@@ -9,23 +9,31 @@ Repository: `CynaCons/powerroadmap` — renamed from `CynaCons/powerplanner` on
 2026-10-28. Observations recorded before that date name the old repository and
 are left as they were observed; the old name still resolves.
 
-## Current state — observed 2026-10-30
+## Current state — observed 2026-11-02
 
 | Surface | State | Observed |
 |---|---|---|
-| GitHub release (latest) | `v2.34.1`, non-draft, not prerelease, published 2026-10-30T19:36:41Z from `main` | `gh release view v2.34.1 --json` |
-| Release assets | `PowerRoadmap.html` alone — 419,816 bytes, `state=uploaded` | `gh release view --json assets` |
-| Asset integrity | `94356d662a3b550150f35bc74bbf4ad6957f6124057ff82f9ebe59d8f1a381eb`, and **five independent reads agree**: the digest GitHub reports, the downloaded asset, the raw update route at the tag, the committed git blob, and the on-disk template | `gh release download`, `curl`, `git cat-file`, `sha256sum` |
-| Published app runs | the downloaded asset opened **straight off the filesystem, no server**: 39 rows, 33 bars, 7 milestones, 2 markers, 6 dependencies, status bar `2.34.1`, zero console errors, and the chart held 1152×826 across selection | browser |
-| Build & Release workflow | `completed/success` for tag `v2.34.1`, 1m5s, run `41116526426` | `gh run list` |
-| Web CI | `completed/success` on `main`, 1m13s, run `41116415088` | same |
+| GitHub release (latest) | `v2.35.0`, non-draft, not prerelease, published 2026-11-02T11:43:13Z from `main` | `gh release view v2.35.0 --json` |
+| Release assets | `PowerRoadmap.html` alone — 427,603 bytes | `gh release view --json assets` |
+| Asset integrity | `b5f61ae9240de043c7b45a14f393ecdd837201133aba259e2f430e983adfb440`, and **four independent reads agree**: the digest GitHub reports, the downloaded asset, the committed git blob at the tag, and the on-disk template | `gh release download`, `git cat-file blob v2.35.0:dist-template/index.html`, `sha256sum` |
+| Published app runs | the downloaded asset opened **straight off the filesystem, no server**, passed all 14 release checks: version 2.35.0 in the bytes, a finger drags a bar 122.6px, the chart is a named tab stop that arrow keys drive, Enter presses a focused button, F2 renames a clicked bar, ctrl-click adds and removes, handles 16×24 / 24×24, 0 of 134 text runs under AA in both themes, today ≠ deadline, the crowded grid held at 0.329 opacity, and a modal keeps focus through 10 Tabs | `scratchpad/verify-v2350.mjs` against the downloaded file |
+| Build & Release workflow | `completed/success` for tag `v2.35.0`, 1m39s, run `41438818946` | `gh run list` |
+| Web CI | `completed/success` on `main`, 1m49s, run `41438803664` | same |
 | GitHub Pages | HTTP 200 at https://cynacons.github.io/powerroadmap/ | `curl` |
-| Pages deploy | **none for this release, correctly** — `site/` is untouched by the nine commits, and `deploy-site.yml` only runs on a push that touches it. Last deploy 2026-10-28. | `git diff --name-only -- site/`, `gh run list --workflow deploy-site.yml` |
-| `src/version.ts` | `2.34.1` | repo |
-| `package.json` | `2.34.1` — matches | repo |
-| `dist-template/index.html` | tracked; the CI rebuild at the tag reproduced the committed bytes exactly, so the blob digest and the on-disk digest agree and `git status` is clean | repo |
+| Pages deploy | **none for this release, correctly** — `site/` is untouched by both commits, and `deploy-site.yml` only runs on a push that touches it. Last deploy 2026-10-28. | `git diff --name-only -- site/`, `gh run list --workflow deploy-site.yml` |
+| `src/version.ts` | `2.35.0` | repo |
+| `package.json` | `2.35.0` — matches | repo |
+| `dist-template/index.html` | tracked and rebuilt at the tag; blob and on-disk digests agree and `git status` is clean | repo |
 | npm | not a surface — nothing published | DECISIONS.md D5 |
 | MCP Registry | not a surface — nothing published | DECISIONS.md D5 |
+
+### The update routes, re-measured at v2.35.0
+
+| Route | Answer |
+|---|---|
+| `api.github.com/repos/CynaCons/powerroadmap/releases/latest` | HTTP 200, `v2.35.0` |
+| `api.github.com/repos/CynaCons/powerplanner/releases/latest` | HTTP 301 to the above, resolving to `v2.35.0` — the redirect every build before v2.20.0 depends on, still alive |
+
 
 The bar count moved from 99 at v2.28.0 to 33 here. That is a counting change,
 not a regression: 99 was three SVG rects per bar, and 33 agrees with what the
@@ -259,6 +267,7 @@ parked, and `web-ci.yml` covers lint, unit, build and the single-file build.
 
 | Date | Surface | Version | Note |
 |---|---|---|---|
+| 2026-11-02 | GitHub release | v2.35.0 | An independent polish round plus the unreleased v2.34.2. Touch and the keyboard reach the chart; Enter presses focused buttons; modals keep focus; F2, ctrl-click, the selection counts and the right-click Delete all corrected; row deletion stops leaving dangling dependencies; the grid, the deadline colour, small-text contrast and empty bars all read. 93 defects found across six measured dimensions, 64 behaviours confirmed sound, 22 fixed; the rest are in the backlog. Full e2e before the tag: 543 reported, 303 passed, 239 skipped by project, 1 failed — a dark-theme contrast assertion that did not reproduce and that the published bytes disprove at 0 of 134 under AA. |
 | 2026-10-30 | GitHub release | v2.34.1 | Six closed iterations since v2.28.0: the save round-trip repaired, the controls moved to a side panel, multi-row selection, mark placement, label editing and bar styling. Full e2e before the tag — 444 reported, 252 passed, 192 skipped by project, 0 failed — and it took three runs, the first two red on real defects. Nine commits; the last published tag had been v2.28.0, so v2.29.0–v2.34.0 were never tagged and ship inside this one. |
 | 2026-10-29 | GitHub release | v2.28.0 | Six iterations from the owner's live walkthrough. First release to publish one asset instead of three. e2e not run before the tag, by the owner's instruction. |
 | 2026-10-28 | GitHub release | v2.21.0 | Last release to carry the three byte-identical aliases. |
