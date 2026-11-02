@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { Row } from '../types/document';
 import { useDocumentStore } from '../stores/documentStore';
 import { InlineLabel } from '../app/InlineLabel';
+import { truncateToGutter, X_CHILD, X_GROUP, X_TOP, RIGHT_PAD } from '../layout/gutterWidth';
 
 interface Props {
   rows: Row[];
@@ -46,6 +47,19 @@ export function RowGutter({ rows, rowHeights, rowOffsets, width }: Props) {
     }
     return { childCount: counts, groupColor: colors };
   }, [allRows, tasks]);
+
+  // Each name cut to the gutter it has to fit in. Memoised on purpose: this
+  // component re-renders on every scroll frame, and the fit is a binary search
+  // over canvas measurements per row.
+  const fitted = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const row of rows) {
+      const group = (childCount.get(row.id) ?? 0) > 0;
+      const x = group ? X_GROUP : row.groupId ? X_CHILD : X_TOP;
+      out.set(row.id, truncateToGutter(row.label, width - x - RIGHT_PAD, group ? 12 : 11, group));
+    }
+    return out;
+  }, [rows, width, childCount]);
 
   return (
     <g>
@@ -104,27 +118,33 @@ export function RowGutter({ rows, rowHeights, rowOffsets, width }: Props) {
                 </g>
                 {!renaming && (
                   <text
-                    x={38}
+                    x={X_GROUP}
                     y={h / 2 + 4}
                     fill="var(--color-text)"
                     fontSize={12}
                     fontWeight={600}
                     style={{ cursor: 'text' }}
                   >
-                    {row.label}
+                    {fitted.get(row.id)}
+                    {/* Only when it was cut. A <title> repeating a name that is
+                        already fully drawn is a second copy of it in the text
+                        tree — a screen reader says it twice, and a locator
+                        looking for the name finds the invisible one first. */}
+                    {fitted.get(row.id) !== row.label && <title>{row.label}</title>}
                   </text>
                 )}
               </>
             ) : (
               !renaming && (
                 <text
-                  x={row.groupId ? 30 : 12}
+                  x={row.groupId ? X_CHILD : X_TOP}
                   y={h / 2 + 4}
                   fill="var(--color-text-soft)"
                   fontSize={11}
                   style={{ cursor: 'text' }}
                 >
-                  {row.label}
+                  {fitted.get(row.id)}
+                  {fitted.get(row.id) !== row.label && <title>{row.label}</title>}
                 </text>
               )
             )}

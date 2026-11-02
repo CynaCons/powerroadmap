@@ -12,11 +12,17 @@ import {
   fiscalQuarterOf,
   isoWeekNumber,
 } from '../utils/dates';
+import { canvasMeasure, type MeasureText } from './gutterWidth';
 
 export interface AxisTick {
   iso: ISODate;
   label: string;
   x: number;
+  /**
+   * This label states which year it is, so it outranks its neighbours when
+   * two will not fit (SRS-TAX-025, SRS-TAX-026). Set by `withYears`.
+   */
+  emphasis?: boolean;
 }
 
 export interface AxisLevel {
@@ -104,6 +110,69 @@ export function visibleEnd(viewStart: ISODate, pxPerDay: number, widthPx: number
   return addDays(viewStart, days);
 }
 
+/**
+ * How each band is actually drawn, so collisions can be measured rather than
+ * guessed. `TimeAxis` draws at exactly these sizes and these x offsets.
+ */
+const BAND_TYPE = {
+  major: { fontPx: 15, bold: true, padX: 8, gap: 8 },
+  minor: { fontPx: 11, bold: false, padX: 4, gap: 6 },
+  micro: { fontPx: 10, bold: false, padX: 2, gap: 4 },
+} as const;
+
+/**
+ * Blank the labels that will not fit beside the one before them
+ * (SRS-TAX-026).
+ *
+ * `thinTicks` spaces the ticks on a fixed minimum — 60px for the month band —
+ * and then `withYears` appends the year to some of them, which is 20px of text
+ * the spacing never allowed for. The band shipped reading "Feb 2026Mar": a
+ * 4px overlap at 1440px, 6.6px at 390px (post-release report, v2.34.1).
+ *
+ * Thinning can only run again with the finished text in hand, so it runs here,
+ * on measured widths, after the years are on. Only the LABEL is dropped — the
+ * tick riser stays, so the month division is still drawn where it falls and
+ * only the name of it is given up.
+ *
+ * A label that states the year outranks a plain one, because a band of months
+ * with no year is the defect SRS-TAX-025 exists to prevent. Two year-bearing
+ * labels colliding would need a year to fit in ~70px, which no scale this axis
+ * offers can produce; if it ever happens, both are kept. An overlap is a
+ * blemish, and a view that cannot say which year it is showing is a bug.
+ */
+function dropCollidingLabels(
+  level: AxisLevel,
+  band: keyof typeof BAND_TYPE,
+  measure: MeasureText,
+): AxisLevel {
+  const { fontPx, bold, padX, gap } = BAND_TYPE[band];
+  const ticks = level.ticks.map((t) => ({ ...t }));
+  let last: { tick: AxisTick; right: number } | null = null;
+
+  for (const tick of ticks) {
+    if (!tick.label) continue;
+    const left = tick.x + padX;
+    const right = left + measure(tick.label, fontPx, bold);
+
+    if (last === null || left >= last.right + gap) {
+      last = { tick, right };
+      continue;
+    }
+    if (tick.emphasis && !last.tick.emphasis) {
+      // Whatever stood here before was clear of the label we are dropping, and
+      // this one starts no earlier, so it is clear of this one too.
+      last.tick.label = '';
+      last = { tick, right };
+    } else if (tick.emphasis) {
+      last = { tick, right };
+    } else {
+      tick.label = '';
+    }
+  }
+
+  return { ticks, height: level.height };
+}
+
 function thinTicks(level: AxisLevel, minSpacingPx: number): AxisLevel {
   if (level.ticks.length <= 1) return level;
   const kept: AxisTick[] = [level.ticks[0]];
@@ -121,6 +190,8 @@ export function buildAxis(
   widthPx: number,
   scale: TimeScale,
   fiscalYearStart: number,
+  /** Injectable so the label thinning can be tested without a canvas. */
+  measure: MeasureText = canvasMeasure,
 ): AxisLayout {
   const end = visibleEnd(viewStart, pxPerDay, widthPx);
   let result: AxisLayout;
@@ -173,6 +244,14 @@ export function buildAxis(
   } else if (scale === 'month') {
     result.minor = withYears(result.minor);
   }
+
+  // And the labels are thinned again now that they are final, against their
+  // measured widths rather than a fixed minimum (SRS-TAX-026).
+  result.major = dropCollidingLabels(result.major, 'major', measure);
+  result.minor = dropCollidingLabels(result.minor, 'minor', measure);
+  if (result.micro) {
+    result.micro = dropCollidingLabels(result.micro, 'micro', measure);
+  }
   return result;
 }
 
@@ -201,13 +280,17 @@ function withYears(level: AxisLevel): AxisLevel {
     const show = turnsTheYear || (readable && !statedOnce);
     previousYear = year;
     if (show) statedOnce = true;
-    return show ? { ...t, label: `${t.label} ${year}` } : t;
+    return show ? { ...t, label: `${t.label} ${year}`, emphasis: true } : t;
   });
   // Every tick is off the left edge — a view narrower than one month. State it
   // on the last one rather than nowhere.
   if (!statedOnce && ticks.length > 0) {
     const last = ticks[ticks.length - 1];
-    ticks[ticks.length - 1] = { ...last, label: `${last.label} ${parseISO(last.iso).getUTCFullYear()}` };
+    ticks[ticks.length - 1] = {
+      ...last,
+      label: `${last.label} ${parseISO(last.iso).getUTCFullYear()}`,
+      emphasis: true,
+    };
   }
   return { ticks, height: level.height };
 }

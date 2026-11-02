@@ -1100,13 +1100,13 @@ Four questions the prototypes must put in front of the owner, because they are v
 - [x] Gate the chart against resizing when the selection changes [agent: claude]
 - [x] Cover the open path for every format it reads [agent: claude]
 
-### v2.34.2 — What the post-release tests found
+### v2.34.2 — What the post-release tests found (current) (ACTIVE)
 **Goal:** The app reads correctly on a phone and in a dark theme.
-- [ ] Keep the header wordmark clear of the toolbar on a phone
-- [ ] Follow the operating system's dark setting on first open
-- [ ] Keep the row labels inside their gutter on a phone
-- [ ] Stop the axis labels printing over each other
-- [ ] Lift the panel's faintest text to a readable contrast
+- [x] Keep the header wordmark clear of the toolbar on a phone [agent: claude]
+- [x] Follow the operating system's dark setting on first open [agent: claude]
+- [x] Keep the row labels inside their gutter on a phone [agent: claude]
+- [x] Stop the axis labels printing over each other [agent: claude]
+- [x] Lift the panel's faintest text to a readable contrast [agent: claude]
 
 # Backlog (High-level, unscheduled — product & long-horizon only)
 - Cloud / sharing edition

@@ -87,10 +87,14 @@ export function Header() {
           title="Settings, about and updates"
           icon={<Settings size={14} strokeWidth={1.75} />}
         />
+        {/* A list of keyboard shortcuts is the one control a phone has no use
+            for, so it is also the one the header can give up to make room for
+            the document's name. */}
         <IconBtn
           onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: '?', shiftKey: true }))}
           title="Keyboard shortcuts (?)"
           icon={<HelpCircle size={14} strokeWidth={1.75} />}
+          phoneHide
         />
         {AgentBridgeToggle && (
           <Suspense fallback={null}>
@@ -134,16 +138,18 @@ interface IconBtnProps {
   label?: string;
   disabled?: boolean;
   active?: boolean;
+  /** Dropped below 560px, where the header has no width to spare. */
+  phoneHide?: boolean;
 }
 
-function IconBtn({ onClick, title, icon, label, disabled, active }: IconBtnProps) {
+function IconBtn({ onClick, title, icon, label, disabled, active, phoneHide }: IconBtnProps) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       title={title}
       aria-pressed={active}
-      className={`app-header__btn ${label ? 'label-hideable' : ''} ${active ? 'is-active' : ''}`}
+      className={`app-header__btn ${label ? 'label-hideable' : ''} ${active ? 'is-active' : ''} ${phoneHide ? 'phone-hideable' : ''}`}
     >
       {icon}
       {label && <span>{label}</span>}

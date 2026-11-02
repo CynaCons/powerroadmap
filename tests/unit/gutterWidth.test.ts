@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { gutterWidthFor, GUTTER_W_MIN, GUTTER_W_MAX } from '../../src/layout/gutterWidth';
+import {
+  gutterWidthFor,
+  truncateToGutter,
+  GUTTER_W_MIN,
+  GUTTER_W_MAX,
+  X_GROUP,
+  X_TOP,
+  RIGHT_PAD,
+} from '../../src/layout/gutterWidth';
 import type { Row } from '../../src/types/document';
 
 /**
@@ -70,15 +78,61 @@ describe('the row panel measures its own names (SRS-LAY-050)', () => {
   });
 
   it('agrees with the x offsets RowGutter actually draws', () => {
-    // The two files carry the offsets separately and have to match; if the
-    // renderer moves its text, this is what says so.
+    // The two files used to carry the offsets separately, and this test read
+    // both sources to catch them drifting apart. They share the constants now,
+    // so there is nothing left to drift — what this guards is that the
+    // renderer still takes them from here rather than going back to literals.
     const gutter = readFileSync('src/renderer/RowGutter.tsx', 'utf8');
-    expect(gutter).toContain('x={38}');
-    expect(gutter).toContain("x={row.groupId ? 30 : 12}");
+    expect(gutter).toContain("from '../layout/gutterWidth'");
+    expect(gutter).toContain('x={X_GROUP}');
+    expect(gutter).toContain('x={row.groupId ? X_CHILD : X_TOP}');
     const widths = readFileSync('src/layout/gutterWidth.ts', 'utf8');
     expect(widths).toContain('X_GROUP = 38');
     expect(widths).toContain('X_CHILD = 30');
     expect(widths).toContain('X_TOP = 12');
+  });
+});
+
+describe('a name is cut to the panel it has to fit (SRS-LAY-053)', () => {
+  // `measure` above is 10px a character, so the arithmetic is checkable.
+  it('leaves a name that fits exactly as it is', () => {
+    expect(truncateToGutter('Spec', 40, 11, false, measure)).toBe('Spec');
+    expect(truncateToGutter('Spec', 1000, 11, false, measure)).toBe('Spec');
+  });
+
+  it('cuts a name that does not, and says so with an ellipsis', () => {
+    const cut = truncateToGutter('Qualification', 60, 11, false, measure);
+    expect(cut).toBe('Quali…');
+    expect(measure(cut)).toBeLessThanOrEqual(60);
+  });
+
+  it('never returns something wider than it was given, at any width', () => {
+    const name = 'Safety mechanisms, E2E and watchdog';
+    for (let available = 0; available <= 400; available += 7) {
+      const cut = truncateToGutter(name, available, 11, false, measure);
+      expect(measure(cut), `"${cut}" at ${available}px`).toBeLessThanOrEqual(available);
+    }
+  });
+
+  it('gives up rather than show a lone ellipsis-sized sliver of nothing', () => {
+    expect(truncateToGutter('Qualification', 5, 11, false, measure)).toBe('');
+    expect(truncateToGutter('Qualification', 0, 11, false, measure)).toBe('');
+    expect(truncateToGutter('Qualification', -20, 11, false, measure)).toBe('');
+  });
+
+  it('does not cut a name in a panel sized to hold it (SRS-LAY-050)', () => {
+    // The invariant the two functions share: the auto width includes the same
+    // RIGHT_PAD this one keeps clear, so auto-sizing and truncation agree.
+    for (const label of ['Spec', 'Qualification campaign', 'Safety mechanisms, E2E and watchdog']) {
+      const width = gutterWidthFor([row('r1', label)], measure);
+      expect(truncateToGutter(label, width - X_TOP - RIGHT_PAD, 11, false, measure)).toBe(label);
+    }
+  });
+
+  it('holds for a group name too, at its own deeper indent', () => {
+    const label = 'Platform — BSW and MCAL';
+    const width = gutterWidthFor([row('g1', label), row('r1', 'child', 'g1')], measure);
+    expect(truncateToGutter(label, width - X_GROUP - RIGHT_PAD, 12, true, measure)).toBe(label);
   });
 });
 

@@ -29,12 +29,21 @@ export function BrandLogo({ variant = 'full', size = 22 }: BrandLogoProps) {
 
   // Full lockup: symbol + wordmark.
   // 22px symbol + 6px gap + ~108px wordmark = 136px @ size=22, scales linearly.
+  //
+  // `slice` is what lets a phone drop the wordmark without a second element in
+  // the DOM: narrow the box in CSS and the viewBox is cropped from the right at
+  // the SAME scale rather than shrunk to fit, so 24px of box shows the symbol
+  // at full size and nothing else. The lockup used to keep its 140px whatever
+  // the window was, and on a 390px phone the toolbar painted straight over it
+  // — "Power ▣ a" (post-release report, v2.34.1).
   const w = size * (140 / 22);
   return (
     <svg
+      className="brand__logo"
       width={w}
       height={size}
       viewBox="0 0 140 22"
+      preserveAspectRatio="xMinYMid slice"
       aria-label="PowerRoadmap"
       role="img"
       style={{ display: 'block', flexShrink: 0 }}

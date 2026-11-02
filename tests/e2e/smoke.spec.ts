@@ -10,8 +10,14 @@ test.describe('PowerRoadmap smoke', () => {
     // Chart SVG renders. There is one now: the minimap that used to follow it
     // was removed in v2.28.0 (SRS-ELEM-060).
     await expect(page.locator('.chart-area > svg').first()).toBeVisible();
-    // Sample tasks rendered
-    await expect(page.locator('text=Stakeholder requirements').first()).toBeVisible();
+    // Sample tasks rendered. Not `text=Stakeholder requirements`: a row name
+    // wider than the panel is cut with an ellipsis and keeps the whole name in
+    // a <title> (SRS-LAY-053), so on a phone that locator resolves to the
+    // invisible title. The row and its bar are what this is really asserting.
+    await expect(
+      page.locator('[data-pp-kind="row"]').filter({ hasText: 'Stakeholder requirements' }),
+    ).toHaveCount(1);
+    await expect(page.locator('.chart-area svg .task-bar-body').first()).toBeVisible();
     // Status bar shows task count
     await expect(page.locator('.app-status')).toContainText('33 tasks');
   });
@@ -30,7 +36,12 @@ test.describe('PowerRoadmap smoke', () => {
     await expect(page.locator('.app-header').getByTitle(/^Add /)).toHaveCount(0);
   });
 
-  test('defaults to light theme and can switch themes', async ({ page }) => {
+  test('opens in the theme the machine asks for, and can switch themes', async ({ page }) => {
+    // Stated rather than assumed: a new document now takes its theme from the
+    // OS (SRS-THEME-005), so "defaults to light" is only true on a machine set
+    // to light. Both directions are covered in `phone-and-theme.spec.ts`; what
+    // this one is about is the switch.
+    await page.emulateMedia({ colorScheme: 'light' });
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 

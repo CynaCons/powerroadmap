@@ -8,8 +8,12 @@ import { test, expect } from '@playwright/test';
  */
 
 async function openRowMenu(page: import('@playwright/test').Page, rowLabel: string) {
-  const label = page.locator(`text=${rowLabel}`).first();
-  const box = await label.boundingBox();
+  // By the row's own group, not by `text=`: where the panel is narrower than
+  // the name, the name is drawn cut and the whole one lives in a <title>
+  // (SRS-LAY-053), which has no box to click. `hasText` reads the group's
+  // text content, so it finds the row either way.
+  const row = page.locator('[data-pp-kind="row"]').filter({ hasText: rowLabel }).first();
+  const box = await row.boundingBox();
   if (!box) throw new Error(`row "${rowLabel}" not found in the gutter`);
   await page.mouse.click(box.x + 20, box.y + box.height / 2, { button: 'right' });
   return page.locator('[role="menu"], .context-menu').first();

@@ -1,5 +1,6 @@
 import type { GanttDocument, Row, Task, Milestone, Dependency } from '../types/document';
 import { addDays, startOfMonth, todayISO } from './dates';
+import { initialTheme } from './theme';
 
 /**
  * The default document — the first and often the only thing anyone sees.
@@ -204,6 +205,6 @@ export function sampleDocument(): GanttDocument {
     brackets: [],
     dependencies,
     markers: [{ id: 'mk-gate', type: 'deadline', label: 'Gate review', date: d(420) }],
-    style: { theme: 'light', preset: 'default' },
+    style: { theme: initialTheme(), preset: 'default' },
   };
 }

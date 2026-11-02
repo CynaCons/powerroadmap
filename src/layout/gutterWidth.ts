@@ -16,11 +16,11 @@ import type { Row } from '../types/document';
  */
 
 /** Where each kind of name starts, matching RowGutter's text `x`. */
-const X_GROUP = 38;
-const X_CHILD = 30;
-const X_TOP = 12;
+export const X_GROUP = 38;
+export const X_CHILD = 30;
+export const X_TOP = 12;
 /** Clear space between the longest name and the divider. */
-const RIGHT_PAD = 16;
+export const RIGHT_PAD = 16;
 
 export const GUTTER_W_MIN = 120;
 export const GUTTER_W_MAX = 520;
@@ -73,4 +73,44 @@ export function gutterWidthFor(rows: Row[], measure: MeasureText = canvasMeasure
   }
 
   return Math.max(GUTTER_W_MIN, Math.min(GUTTER_W_MAX, Math.ceil(widest)));
+}
+
+/**
+ * The name as it can actually be drawn in `available` px, with an ellipsis
+ * when it has to be cut (SRS-LAY-053).
+ *
+ * The gutter is not always as wide as its names want: it is clamped to
+ * `GUTTER_W_MIN` on a narrow window, and the divider can be dragged anywhere.
+ * `RowGutter` drew the full name regardless, with nothing clipping it, so on a
+ * 390px phone 28 of 39 names ran out of the gutter and across the plot — one
+ * of them 97px into the bars it was supposed to label (post-release report,
+ * v2.34.1).
+ *
+ * Measured with the same function and the same `RIGHT_PAD` as the auto-width
+ * above, which gives the pair an invariant worth having: a gutter sized to its
+ * own names never truncates. Text is only ever cut because the gutter is
+ * narrower than the names asked for.
+ */
+export function truncateToGutter(
+  text: string,
+  available: number,
+  fontPx: number,
+  bold: boolean,
+  measure: MeasureText = canvasMeasure,
+): string {
+  if (available <= 0) return '';
+  if (measure(text, fontPx, bold) <= available) return text;
+
+  const ellipsis = '…';
+  if (measure(ellipsis, fontPx, bold) > available) return '';
+
+  // Longest prefix that still fits with the ellipsis on it.
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (measure(text.slice(0, mid).trimEnd() + ellipsis, fontPx, bold) <= available) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo === 0 ? ellipsis : text.slice(0, lo).trimEnd() + ellipsis;
 }

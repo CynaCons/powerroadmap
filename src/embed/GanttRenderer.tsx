@@ -17,6 +17,7 @@ import { buildAxis, dateToX } from '../layout/timeAxis';
 import { computeCriticalPath } from '../layout/criticalPath';
 import { diffDays, addDays, todayISO } from '../utils/dates';
 import { delimiterXs, nonWorkingBands } from '../layout/grid';
+import { truncateToGutter, RIGHT_PAD } from '../layout/gutterWidth';
 import { gridDelimiterOf, weekendDisplayOf } from '../types/document';
 
 export interface GanttRendererOptions {
@@ -189,18 +190,29 @@ export function GanttRenderer({ document, width, height, options = {} }: GanttRe
         </g>
       </g>
 
-      {/* Row gutter labels */}
+      {/* Row gutter labels.
+          Cut to the gutter for the same reason the app cuts them (SRS-LAY-053):
+          nothing clips this group, so a name longer than the gutter is drawn
+          straight across the bars. The gutter here is at most 180px and as
+          little as 80px, which is narrower than the app's, so an export of a
+          plan with real package names overflowed every time. */}
       <g transform={`translate(0 ${AXIS_H})`}>
-        {layout.visibleRows.map((row, i) => (
+        {layout.visibleRows.map((row, i) => {
+          const x = 12 + (row.groupId ? 16 : 0);
+          const shown = truncateToGutter(row.label, gutterW - x - RIGHT_PAD, 11, false);
+          return (
           <g key={row.id} transform={`translate(0 ${layout.rowOffsets[i]})`}>
             <text
-              x={12 + (row.groupId ? 16 : 0)}
+              x={x}
               y={layout.rowHeights[i] / 2 + 4}
               fill="var(--pp-text, #0b0c0f)"
               fontSize={11}
               fontWeight={500}
             >
-              {row.label}
+              {shown}
+              {/* Only when it was cut: a <title> echoing a name that is drawn
+                  in full puts a second copy of it in the text tree. */}
+              {shown !== row.label && <title>{row.label}</title>}
             </text>
             <line
               x1={0}
@@ -211,7 +223,8 @@ export function GanttRenderer({ document, width, height, options = {} }: GanttRe
               strokeWidth={0.5}
             />
           </g>
-        ))}
+          );
+        })}
       </g>
 
       {/* Chart content. The clip rect is written in ABSOLUTE coordinates, so it

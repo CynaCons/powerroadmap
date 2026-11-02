@@ -340,6 +340,12 @@ kbd {
      onto a second line and File landed on top of the chart — unreachable. */
   flex: 1 1 auto;
   min-width: 0;
+  /* And nothing inside it may paint outside it. `min-width: 0` lets the box
+     shrink, but the lockup inside is a fixed-size SVG with `flex-shrink: 0`:
+     at 390px the box went to 25px and the 140px mark carried on across the
+     toolbar underneath, which drew its own background over the wordmark. A
+     clip makes that impossible at every width, whatever is in here. */
+  overflow: hidden;
 }
 .app-header .brand__sep {
   width: 1px;
@@ -429,6 +435,22 @@ kbd {
   .app-header__btn.label-hideable span { display: none; }
 }
 
+/* The phone header.
+ *
+ * The toolbar is the fixed part and the brand is what shrinks, so on a 390px
+ * screen the brand was left 25px and the document's name was gone. Four
+ * reductions, in the order of what matters least: the keyboard-shortcuts
+ * button (nothing to press on a phone), the hairline between mark and title,
+ * the wordmark itself — cropped to the symbol by `slice`, not scaled down —
+ * and 4px of each outer margin. That returns ~160px to the name. */
+@media (max-width: 560px) {
+  .app-header { padding: 0 10px; }
+  .app-header__btn.phone-hideable { display: none; }
+  .app-header .brand { gap: 8px; }
+  .app-header .brand__sep { display: none; }
+  .brand__logo { width: 24px; }
+}
+
 
 /* Chart */
 .chart-area {
@@ -514,11 +536,17 @@ kbd {
   font-weight: 700;
   letter-spacing: 0.9px;
   text-transform: uppercase;
-  color: var(--color-text-dim);
+  /* These four words — TOOLS, INSERT, VIEW, DOCUMENT — are how the panel is
+     navigated, and `--color-text-dim` put them at 3.00:1 on the panel, under
+     AA in both themes (post-release report, v2.34.1). `dim` is for text that
+     is genuinely secondary; a section heading is not. */
+  color: var(--color-text-soft);
   cursor: pointer;
   text-align: left;
 }
-.cmdbar__section-head:hover { background: var(--color-bg-subtle); color: var(--color-text-soft); }
+/* `soft` is the resting colour now, so hover goes all the way to full ink —
+   otherwise the heading answered a hover with no change of its own. */
+.cmdbar__section-head:hover { background: var(--color-bg-subtle); color: var(--color-text); }
 .cmdbar__section-head:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 .cmdbar__section-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .cmdbar__section-icon { flex-shrink: 0; color: var(--color-text-dim); }

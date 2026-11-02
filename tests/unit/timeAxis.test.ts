@@ -140,3 +140,80 @@ describe('the year survives clipping and thinning', () => {
     expect(yearsIn(labels)).toEqual(['2026']);
   });
 });
+
+/**
+ * SRS-TAX-026 — labels are thinned a second time, on measured widths.
+ *
+ * `thinTicks` spaces ticks on a fixed minimum and `withYears` then appends
+ * four digits the spacing never allowed for, so the month band shipped reading
+ * "Feb 2026Mar": 4px of overlap at 1440px, 6.6px at 390px.
+ */
+describe('labels that will not fit are given up (SRS-TAX-026)', () => {
+  const WIDTH = 1200;
+  /** Every glyph `wide` px, so collisions can be dialled in exactly. */
+  const measurer = (wide: number) => (text: string) => text.length * wide;
+
+  const nonEmpty = (level: { ticks: { label: string; x: number }[] }) =>
+    level.ticks.filter((t) => t.label);
+
+  it('blanks the label but keeps the tick', () => {
+    const narrow = buildAxis('2026-10-01', 4, WIDTH, 'week', 1, measurer(1));
+    const wide = buildAxis('2026-10-01', 4, WIDTH, 'week', 1, measurer(40));
+    expect(wide.major.ticks.length).toBe(narrow.major.ticks.length);
+    expect(nonEmpty(wide.major).length).toBeLessThan(nonEmpty(narrow.major).length);
+    // The month divisions are all still there to be drawn.
+    expect(wide.major.ticks.every((t) => Number.isFinite(t.x))).toBe(true);
+  });
+
+  it('keeps the label that states the year and drops its plain neighbour', () => {
+    // 40px a glyph: "Oct 2026" is 320px wide and nothing else fits beside it.
+    const axis = buildAxis('2026-10-01', 4, WIDTH, 'week', 1, measurer(40));
+    const kept = nonEmpty(axis.major).map((t) => t.label);
+    expect(kept).toContain('Oct 2026');
+    expect(kept).not.toContain('Nov');
+  });
+
+  it('still says which year it is, however wide the type', () => {
+    for (const wide of [1, 8, 20, 40, 80]) {
+      const axis = buildAxis('2026-10-01', 4, WIDTH, 'week', 1, measurer(wide));
+      const years = nonEmpty(axis.major).filter((t) => /\d{4}$/.test(t.label));
+      expect(years.length, `nothing stated the year at ${wide}px a glyph`).toBeGreaterThan(0);
+    }
+  });
+
+  it('leaves no two surviving labels overlapping, at any scale', () => {
+    const wide = 9;
+    const measure = measurer(wide);
+    for (const [start, px, scale] of [
+      ['2026-10-19', 6, 'week'],
+      ['2026-10-19', 24, 'day'],
+      ['2026-01-15', 1.37, 'week'],
+      ['2026-05-25', 8, 'week'],
+      ['2026-01-01', 1, 'quarter'],
+      ['2026-03-01', 10, 'month'],
+    ] as const) {
+      const axis = buildAxis(start, px, WIDTH, scale, 1, measure);
+      for (const [name, level] of [
+        ['major', axis.major],
+        ['minor', axis.minor],
+        ['micro', axis.micro],
+      ] as const) {
+        if (!level) continue;
+        const shown = nonEmpty(level);
+        for (let i = 1; i < shown.length; i++) {
+          const prevRight = shown[i - 1].x + measure(shown[i - 1].label);
+          expect(
+            prevRight,
+            `${scale}/${name}: "${shown[i - 1].label}" runs into "${shown[i].label}"`,
+          ).toBeLessThanOrEqual(shown[i].x);
+        }
+      }
+    }
+  });
+
+  it('gives up nothing when everything fits', () => {
+    const axis = buildAxis('2026-10-19', 6, WIDTH, 'week', 1, measurer(1));
+    expect(nonEmpty(axis.minor).length).toBe(axis.minor.ticks.length);
+    expect(nonEmpty(axis.major).length).toBe(axis.major.ticks.length);
+  });
+});
