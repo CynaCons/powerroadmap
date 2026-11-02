@@ -62,13 +62,15 @@ let currentHandle: FileSystemFileHandleLike | null = null;
  */
 export function detachFile(): void {
   currentHandle = null;
+  boundFormat = null;
   bindFile(null);
   void forgetHandle();
 }
 
 /** Bind to a file, and remember it for the next session (SRS-PERS-035). */
-function bindTo(handle: FileSystemFileHandleLike): void {
+function bindTo(handle: FileSystemFileHandleLike, format: SaveFormat | null = null): void {
   currentHandle = handle;
+  boundFormat = format;
   bindFile(handle.name);
   void rememberHandle(handle as unknown as StoredFileHandle);
 }
@@ -156,15 +158,18 @@ export interface SaveResult {
 
 async function writeThrough(
   handle: FileSystemFileHandleLike,
-  html: string,
+  text: string,
 ): Promise<SaveResult> {
   const name = handle.name;
   try {
     setSaveState('saving');
     const writable = await handle.createWritable();
-    await writable.write(html);
+    await writable.write(text);
     await writable.close();
-    bindTo(handle);
+    // The file now holds whatever was just written, so the binding records
+    // that — otherwise a Save As to an extensionless name would leave the
+    // session thinking the file still held what it held before.
+    bindTo(handle, formatForName(handle.name, boundFormat ?? 'html'));
     setSaveState('saved');
     return { outcome: 'written', name };
   } catch (e) {
@@ -228,12 +233,70 @@ export async function autosaveToFile(doc: GanttDocument): Promise<boolean> {
     if (isHandleForThisDocument(handle)) setSaveState('needs-permission');
     return false;
   }
-  const built = await prepareHtml(doc);
-  if (!built.ok) {
+  // Autosave wrote HTML into whatever the handle was too, so a .json plan was
+  // overwritten on a timer without anyone pressing anything (SRS-PERS-040).
+  const built = await serializeFor(handle.name, doc, boundFormat ?? 'html');
+  if (built.error) {
     setSaveState('error', built.error);
     return false;
   }
-  return (await writeThrough(handle, built.html)).outcome === 'written';
+  return (await writeThrough(handle, built.text)).outcome === 'written';
+}
+
+/**
+ * What a file of this name holds (SRS-PERS-040).
+ *
+ * `finishSave` built HTML and wrote it whatever the handle was, so a plan
+ * opened from `sprint.json` — 604 bytes of JSON — came back after one edit and
+ * one Ctrl+S as a 430KB HTML document still called `sprint.json`, which the
+ * loader then tried to `JSON.parse`. The original was gone and the app could
+ * never read the file again.
+ *
+ * The extension decides it for the three names the loader dispatches on. For
+ * anything else — no extension, or one this app does not know — the extension
+ * decides NOTHING, because `parseFileContents` reads that class by trying JSON
+ * and then YAML, never HTML. Claiming `html` there would leave exactly the old
+ * loss in place for that class: a JSON plan opened as `sprint` with no
+ * extension, saved, and then unreadable. So the caller passes what the file
+ * was last known to hold, and only a file nothing is known about gets the
+ * application — which is what this product is, and all the picker offers.
+ */
+export type SaveFormat = 'html' | 'json' | 'yaml';
+
+export function formatForName(name: string, unknown: SaveFormat = 'html'): SaveFormat {
+  if (/\.html?$/i.test(name)) return 'html';
+  if (/\.json$/i.test(name)) return 'json';
+  if (/\.ya?ml$/i.test(name)) return 'yaml';
+  return unknown;
+}
+
+/**
+ * What the bound file was read as, for the name class the extension cannot
+ * settle. Cleared with the binding, because it describes that file alone.
+ */
+let boundFormat: SaveFormat | null = null;
+
+/** What the bound file holds, as far as this session knows. */
+export function getBoundFormat(): SaveFormat | null {
+  return boundFormat;
+}
+
+/** The bytes that belong in a file of this name, and what kind they are. */
+export async function serializeFor(
+  name: string,
+  doc: GanttDocument,
+  unknown: SaveFormat = 'html',
+): Promise<{ format: SaveFormat; text: string; mime: string; error?: string }> {
+  const format = formatForName(name, unknown);
+  if (format === 'json') {
+    return { format, text: JSON.stringify(doc, null, 2), mime: 'application/json' };
+  }
+  if (format === 'yaml') {
+    return { format, text: toYaml(doc), mime: 'text/yaml' };
+  }
+  const built = await prepareHtml(doc);
+  if (!built.ok) return { format, text: '', mime: 'text/html', error: built.error };
+  return { format, text: built.html, mime: 'text/html' };
 }
 
 async function finishSave(
@@ -242,16 +305,19 @@ async function finishSave(
   why: SaveOutcome | null,
   suggestedName: string,
 ): Promise<SaveResult> {
-  const built = await prepareHtml(doc);
-  if (!built.ok) {
+  // The name decides the format, so a plan opened from .json or .yaml is
+  // written back as what it was; where the name cannot decide, what the file
+  // was read as does (SRS-PERS-040).
+  const built = await serializeFor(handle?.name ?? suggestedName, doc, boundFormat ?? 'html');
+  if (built.error) {
     setSaveState('error', built.error);
     return { outcome: 'failed', name: suggestedName, error: built.error };
   }
   if (!handle) {
-    downloadFile(suggestedName, built.html, 'text/html');
+    downloadFile(suggestedName, built.text, built.mime);
     return { outcome: why ?? 'downloaded-no-picker', name: suggestedName };
   }
-  return writeThrough(handle, built.html);
+  return writeThrough(handle, built.text);
 }
 
 /** The handle, and — when there is none — WHY there is none. */
@@ -338,12 +404,13 @@ export async function writeHtmlToHandle(
  * browsers where saving works at all, said nothing.
  */
 export type OpenResult =
-  | { doc: GanttDocument; name: string }
+  | { doc: GanttDocument; name: string; format: SaveFormat }
   | { error: 'cancelled' | 'not-a-roadmap'; name?: string; message?: string };
 
 function readInto(name: string, text: string): OpenResult {
   try {
-    return { doc: parseFileContents(name, text), name };
+    const { doc, format } = parseWithFormat(name, text);
+    return { doc, name, format };
   } catch (e) {
     return { error: 'not-a-roadmap', name, message: (e as Error).message };
   }
@@ -366,7 +433,7 @@ export async function openFile(): Promise<OpenResult> {
     const result = readInto(file.name, await file.text());
     // Bind ONLY a file that turned out to hold a roadmap: binding one that did
     // not would make the next save overwrite it.
-    if ('doc' in result) bindTo(handle);
+    if ('doc' in result) bindTo(handle, result.format);
     return result;
   }
   return new Promise<OpenResult>((resolve) => {
@@ -403,22 +470,34 @@ export async function reloadFromFile(): Promise<OpenResult> {
 }
 
 export function parseFileContents(name: string, text: string): GanttDocument {
+  return parseWithFormat(name, text).doc;
+}
+
+/**
+ * The same read, plus which of the four branches did it (SRS-PERS-040).
+ *
+ * A name with no extension, or one this app does not know, is read by trying
+ * JSON and then YAML. The save side has to be told which of those two it was,
+ * or it would write the application into a data file under a name that gives
+ * it no way to find out.
+ */
+export function parseWithFormat(name: string, text: string): { doc: GanttDocument; format: SaveFormat } {
   if (/\.html?$/i.test(name)) {
     const match = text.match(/<script[^>]*id=["']powerplanner-data["'][^>]*>([\s\S]*?)<\/script>/i);
     if (!match) throw new Error('No embedded PowerRoadmap data found in this HTML file.');
-    return validateDocument(JSON.parse(match[1]));
+    return { doc: validateDocument(JSON.parse(match[1])), format: 'html' };
   }
   if (/\.json$/i.test(name)) {
-    return validateDocument(JSON.parse(text));
+    return { doc: validateDocument(JSON.parse(text)), format: 'json' };
   }
   if (/\.ya?ml$/i.test(name)) {
-    return validateDocument(fromYaml(text));
+    return { doc: validateDocument(fromYaml(text)), format: 'yaml' };
   }
   // Try JSON first, then YAML
   try {
-    return validateDocument(JSON.parse(text));
+    return { doc: validateDocument(JSON.parse(text)), format: 'json' };
   } catch {
-    return validateDocument(fromYaml(text));
+    return { doc: validateDocument(fromYaml(text)), format: 'yaml' };
   }
 }
 

@@ -1133,6 +1133,19 @@ Four questions the prototypes must put in front of the owner, because they are v
 - [x] Give a dialog focus when it opens and keep it inside [agent: claude]
 - [x] Make a bar at zero per cent visible against the sheet [agent: claude]
 
+### v2.35.1 — Three ways a plan could be lost (COMPLETE)
+**Goal:** A plan survives being saved, opened and printed.
+- [x] Save a plan back in the format its file already holds [agent: claude]
+- [x] Autosave in that format too, not only on Ctrl+S [agent: claude]
+- [x] Refuse a date whose day does not exist [agent: claude]
+- [x] Say which field held the impossible date [agent: claude]
+- [x] Print every row, not the ones the window shows [agent: claude]
+- [x] Let the printed chart break across pages [agent: claude]
+- [x] Stop the updater replacing a data file with the app [agent: claude]
+- [x] Save the format a nameless file was read as [agent: claude]
+- [x] Scale the printed chart instead of clipping it [agent: claude]
+- [x] Replace three assertions that could not fail [agent: claude]
+
 # Backlog (High-level, unscheduled — product & long-horizon only)
 - Cloud / sharing edition
 - Excel/CSV linking, resource swimlanes, baselines, AI assist, collaboration
@@ -1187,3 +1200,13 @@ See git for full historical web iterations (v0–v2).
 - Selecting a second bar removes every styling control from the panel
 - The e2e suite spends minutes in teardown after the last test finishes
 - One tablet dependency test flakes about once in fifty runs
+- Rebuild Settings as a sectioned panel with a side index
+- Give the agent bridge a settings section that ships
+- Show the bound file and its save state in Settings
+- Put the chart's look and input settings in the panel
+- Match PowerScroll's update, reload and save wording
+- Repeat the calendar header on every printed page
+- Say something when an opened file holds an impossible date
+- Check dates on the write side, not only on read
+- Fall back to matchMedia print where beforeprint does not fire
+- Stop the suite force-killing workers at teardown

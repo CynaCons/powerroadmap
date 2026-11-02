@@ -1036,10 +1036,27 @@ kbd {
    rather than re-nested — .app-shell above already says one column and the
    three areas that exist, which is what every width wants. */
 
+/* Paper has no fold (SRS-EXP-005). The shell is 100vh with a clipped chart
+   inside it, which gives the printer exactly one page and silently drops the
+   rest of the plan: measured on the 39-row sample, 17 rows printed and 22 were
+   never painted. Every box between the page and the sheet has to be allowed to
+   grow, or the taller SVG that `printing` draws is simply clipped away again.
+   The axis is a `position: sticky` header on screen; on paper it has to stay
+   with the top of the chart, or it repeats into the middle of a page. */
 @media print {
   .app-header, .app-status, .cmdbar, .notice-stack { display: none !important; }
-  .app-shell { grid-template-rows: 1fr; grid-template-columns: 1fr; grid-template-areas: 'chart'; }
-  .chart-area { overflow: visible; }
+  html, body, #root { height: auto; overflow: visible; }
+  .app-shell {
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+  .chart-area { overflow: visible; height: auto; min-height: 0; }
+  /* Fit the page's width and let the height follow, so a wide chart is scaled
+     rather than cut. This works only because `printing` puts a viewBox on the
+     element — without one these two lines clip the plan away instead. */
+  .chart-area svg { position: static; width: 100%; max-width: 100%; height: auto; }
 }
 
 /* Scrollbar polish */

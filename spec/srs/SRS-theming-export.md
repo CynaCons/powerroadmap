@@ -30,8 +30,29 @@ exporting image/vector files, so these requirements apply to the web surface.
 | SRS-EXP-002 `[web]` | The system shall export PNG at selectable scale (1x, 2x) by rasterizing the SVG. | Raster output for tools that need bitmaps; 2x for retina. | Demo | export |
 | SRS-EXP-003 `[web]` | The system shall produce print/PDF output via the print theme (chart only). | Presentation-grade hard copy. | Demo | print stylesheet |
 | SRS-EXP-004 | Exported output shall be presentation-grade: crisp primitives, stable spacing, readable labels. | The product promise is "charts you can actually present". | Review | visual-vocabulary |
+| SRS-EXP-005 `[web]` | Printing shall put the whole plan on paper, starting at its top and breaking across as many pages as it needs. | The chart is not a scrollable element: the SVG is exactly the size of the window and the plan moves under it through `scrollY`, so printing printed the window. Measured on the 39-row sample at 1440x900, the shipped v2.35.0 build produced one page carrying 19 of the 39 row names — the rest were not cut off at the page edge, they were never painted — and a scrolled window printed from wherever it had been left. Growing the sheet is not enough on its own: the shell is `100vh` with a clipped chart inside it, so the taller sheet is clipped away again unless every box between the page and the chart may grow. The re-render has to be flushed synchronously, because the browser lays the pages out as soon as the `beforeprint` handler returns. | Test: `tests/e2e/print-pagination.spec.ts` Review before release found two more things the first attempt got wrong, both measured on the real print path rather than on a dispatched event. Growing the sheet and then constraining it with `max-width: 100%` printed LESS than before: an SVG with no `viewBox` has its box shrunk while its content stays at 1:1 user units, and `svg:root` clips the remainder, so at the default page size the 39-row sample printed 23 of 39 rows from a 1440px window and 16 of 39 from 1920px, the right of the timeline cut off in both. A `viewBox` applied while printing makes the printer scale instead of clip: 39 of 39 at every width tried. And the suite could not have caught any of it, because the spec dispatches `beforeprint` itself. | Test: `tests/e2e/print-pagination.spec.ts` | `app/ChartArea` `printing`/`viewHeight`/`viewBox`; `styles/global.css` `@media print` |
 
 ## Open items
 
 - Export requirements verify by Demo; an SVG-serialization snapshot test would
   promote SRS-EXP-001 to Test (the `spec/visual` generator is a step toward this).
+  SRS-EXP-003 is the one that shows what Demo costs: a print theme existed and
+  was demonstrable, and the output had been wrong since the chart stopped being
+  a scrollable element. SRS-EXP-005 now gates it by measurement.
+
+- **The calendar axis prints on the first page only, and a row can be cut
+  through by the page break.** SRS-EXP-005 puts the whole plan on paper; it
+  does not yet make every page readable on its own. The axis is painted once at
+  the top of one tall SVG, inside `chart-axis-clip`, so a plan that needs a
+  second page carries bars there with no dates above them — which SRS-EXP-004
+  speaks to directly. Repeating the header per page means emitting one SVG per
+  page rather than one tall one, which is a larger change than this slice; it
+  is in the backlog. Measured on the 39-row sample: two pages from a 1440px
+  window, the axis on page 1.
+
+- **`beforeprint` does not fire in WebKit under Playwright**, so the `tablet`
+  and `mobile` projects report SRS-EXP-005 green for a path their browser never
+  enters: the spec dispatches the event itself, which exercises the handler
+  rather than the browser's print. Chromium fires both events and the fix works
+  there, verified on the built file. Whether Safari proper fires them is
+  untested, and a `matchMedia('print')` fallback is in the backlog.

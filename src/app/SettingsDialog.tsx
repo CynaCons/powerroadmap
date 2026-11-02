@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 import { APP_VERSION } from '../version';
 import { useDocumentStore } from '../stores/documentStore';
 import { checkForUpdate, performUpdate, type UpdateInfo } from '../utils/updateChecker';
-import { getCurrentHandle } from '../persistence/fileIo';
+import { formatForName, getCurrentHandle } from '../persistence/fileIo';
 import { notify } from '../stores/noticeStore';
 import { useDialogFocus } from './useDialogFocus';
 
@@ -53,8 +53,12 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const update = async () => {
     if (!info?.latestVersion) return;
     // Whether the file can be rewritten in place decides the wording, so it is
-    // settled before the work starts rather than guessed afterwards.
-    setStatus(getCurrentHandle() ? 'updating-live' : 'updating-download');
+    // settled before the work starts rather than guessed afterwards — and it
+    // asks the same question `performUpdate` does. A plan bound to a `.json`
+    // file is never rewritten in place (SRS-PERS-040), so saying "updating
+    // this file" there told the planner the opposite of what happened.
+    const bound = getCurrentHandle();
+    setStatus(bound && formatForName(bound.name) === 'html' ? 'updating-live' : 'updating-download');
 
     const result = await performUpdate(
       doc,

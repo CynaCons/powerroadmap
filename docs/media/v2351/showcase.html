@@ -1,0 +1,581 @@
+<title>PowerRoadmap v2.35.1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: one narrow column of records. Each states a defect, then shows the
+     evidence. The measurements are the page's recurring motif — this is an
+     engineering record, so the numbers carry it rather than ornament.
+     Colour and type come from the app's own tokens (src/styles/global.css). */
+  :root {
+    --ground: #FBFBFA;
+    --surface: #FFFFFF;
+    --rule: #D4D4CE;
+    --hair: rgba(0, 0, 0, 0.07);
+    --ink: #1C2430;
+    --ink-soft: #5A6472;
+    --ink-dim: #8A93A0;
+    --accent: #2F4369;
+    --accent-soft: rgba(47, 67, 105, 0.09);
+    --defect: #B3382C;
+    --defect-soft: rgba(179, 56, 44, 0.08);
+    --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #15181F;
+      --surface: #1C212B;
+      --rule: #333A47;
+      --hair: rgba(255, 255, 255, 0.08);
+      --ink: #E8EBF0;
+      --ink-soft: #A7AEBC;
+      --ink-dim: #767E8D;
+      --accent: #8FA6D4;
+      --accent-soft: rgba(143, 166, 212, 0.13);
+      --defect: #E2796C;
+      --defect-soft: rgba(226, 121, 108, 0.12);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #15181F;
+    --surface: #1C212B;
+    --rule: #333A47;
+    --hair: rgba(255, 255, 255, 0.08);
+    --ink: #E8EBF0;
+    --ink-soft: #A7AEBC;
+    --ink-dim: #767E8D;
+    --accent: #8FA6D4;
+    --accent-soft: rgba(143, 166, 212, 0.13);
+    --defect: #E2796C;
+    --defect-soft: rgba(226, 121, 108, 0.12);
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15.5px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 3.5rem 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 6vw, 2.9rem);
+    line-height: 1.08;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    line-height: 1.25;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  p { margin: 0; max-width: 62ch; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+
+  header .lede {
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    max-width: 58ch;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.4rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink-dim);
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--rule);
+  }
+  .meta b { color: var(--ink-soft); font-weight: 500; }
+
+  header { display: flex; flex-direction: column; gap: 1rem; }
+
+  .record {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    min-width: 0;
+  }
+  .record > .eyebrow { margin-bottom: -0.65rem; }
+
+  .defect {
+    border-left: 3px solid var(--defect);
+    background: var(--defect-soft);
+    padding: 0.85rem 1.1rem;
+    border-radius: 0 6px 6px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+  .defect h3 { color: var(--defect); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; font-family: var(--mono); font-weight: 600; }
+  .defect p { font-size: 0.95rem; color: var(--ink); }
+
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+  figure img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    border: 1px solid var(--rule);
+    border-radius: 7px;
+    background: var(--surface);
+  }
+  figcaption {
+    font-size: 0.82rem;
+    color: var(--ink-dim);
+    font-family: var(--mono);
+    line-height: 1.5;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  .trio {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  @media (max-width: 640px) {
+    .pair, .trio { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .measure {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 7px;
+    padding: 0.9rem 1.1rem;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+    overflow-x: auto;
+    font-variant-numeric: tabular-nums;
+  }
+  .measure b { color: var(--ink); font-weight: 600; }
+  .measure .arrow { color: var(--accent); }
+
+  .veto {
+    border: 1px dashed var(--rule);
+    border-radius: 7px;
+    padding: 0.9rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    background: var(--accent-soft);
+    min-width: 0;
+  }
+  .veto h3 { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+  .veto p { font-size: 0.92rem; }
+
+  .srs {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-dim);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    font-variant-numeric: tabular-nums;
+  }
+  th, td { text-align: left; padding: 0.5rem 0.7rem 0.5rem 0; border-bottom: 1px solid var(--hair); }
+  th { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); font-weight: 500; }
+  td.num { font-family: var(--mono); text-align: right; padding-right: 0; white-space: nowrap; }
+  .scroller { overflow-x: auto; min-width: 0; }
+
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+</style>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">PowerRoadmap · release showcase</div>
+    <h1>v2.35.1</h1>
+    <p class="lede">
+      Three ways a plan could be lost, all of them found by testing v2.35.0
+      after it shipped rather than by a report. Saving a plan that lives in a
+      <code>.json</code> file destroyed it. One impossible date left the whole
+      application blank with nothing on screen to say why. And printing a plan
+      printed the window — the rows below the fold were not cut off at the page
+      edge, they were never drawn.
+    </p>
+    <div class="meta">
+      <span><b>Iteration</b> v2.35.1</span>
+      <span><b>Fixed</b> 3</span>
+      <span><b>New requirements</b> SRS-PERS-040, SRS-PERS-041, SRS-EXP-005</span>
+      <span><b>Captured from</b> the shipped v2.35.0 build and this tree</span>
+    </div>
+  </header>
+
+  <hr>
+
+  <!-- 1 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">Persistence · the primary verb</div>
+    <h2>A file is saved in the format it already holds</h2>
+
+    <div class="defect">
+      <h3>The defect</h3>
+      <p>
+        <code>finishSave</code> built the single-file HTML application and wrote
+        it, whatever the handle was — while the loader dispatches on the
+        extension. So a plan opened from <code>sprint.json</code> came back
+        after one edit and one Ctrl+S as a 430 KB HTML document still called
+        <code>sprint.json</code>, and <code>JSON.parse</code> could never read
+        it again. The original was gone. The autosave of SRS-PERS-037 did the
+        same thing on a timer, without a keystroke.
+      </p>
+    </div>
+
+    <p>
+      Measured in the running app, on the 39-row sample, through the shipped
+      functions:
+    </p>
+
+    <div class="measure">
+      <span>what v2.35.0 wrote into <code>sprint.json</code> <span class="arrow">→</span> <b>440,791 bytes</b> of <code>&lt;!doctype html&gt;</code></span>
+      <span>handing those bytes back to the loader <span class="arrow">→</span> <b>Unexpected token '&lt;'</b></span>
+      <span>what it writes now <span class="arrow">→</span> <b>13,382 bytes</b> of JSON, <b>10,051</b> for YAML</span>
+      <span>handing those back <span class="arrow">→</span> reopened <b>39 rows, 33 tasks</b></span>
+    </div>
+
+    <p>
+      The file picker still offers <code>.html</code> alone, because the
+      self-contained application is what this product is. The rule applies to
+      the file the planner already chose: the format follows the name, exactly
+      as the loader reads it, so a save and an open can never disagree. An
+      <code>.html</code> control test keeps “never write HTML” from passing
+      every case and breaking the format the product ships as.
+    </p>
+    <div class="srs">SRS-PERS-040 · <code>tests/unit/saveFormat.test.ts</code></div>
+  </section>
+
+  <!-- 2 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">Persistence · validation</div>
+    <h2>A date has to be a day that exists</h2>
+
+    <div class="defect">
+      <h3>The defect</h3>
+      <p>
+        <code>isISODate</code> was a shape test and nothing else —
+        <code>/^\d{4}-\d{2}-\d{2}$/</code>. So <code>2026-13-45</code> passed
+        validation, the file opened, the notice said “Opened wedged.json”, and
+        the viewport arithmetic went to NaN: no calendar axis at all, no bars,
+        nothing to click, and no message. The planner is left with a blank
+        application and no way to learn why.
+      </p>
+    </div>
+
+    <p>What the refusal says now, read out of the running app:</p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Field</th><th>Value</th><th>Message</th></tr></thead>
+        <tbody>
+          <tr><td><code>tasks[0].start</code></td><td>2026-13-45</td><td>tasks[0].start is not a day that exists: 2026-13-45</td></tr>
+          <tr><td><code>milestones[0].date</code></td><td>2026-02-30</td><td>milestones[0].date is not a day that exists: 2026-02-30</td></tr>
+          <tr><td><code>calendar.holidays[0]</code></td><td>2026-04-31</td><td>calendar.holidays[0] is not a day that exists: 2026-04-31</td></tr>
+          <tr><td><code>tasks[0].end</code></td><td>1900-02-29</td><td>tasks[0].end is not a day that exists: 1900-02-29</td></tr>
+          <tr><td><code>tasks[0].start</code></td><td>2028-02-29</td><td><b>accepted</b> — 2028 is a leap year</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      The old message named the row index alone, which in a two-hundred-row
+      plan is not enough to find the field. Month length is arithmetic rather
+      than <code>Date.UTC</code>, which maps years 0–99 onto 1900–1999 and would
+      have accepted <code>0099-02-29</code>. The refusal is also whole: the plan
+      that was open stays on screen, because a half-loaded document is what
+      produced the blank chart in the first place.
+    </p>
+
+    <div class="measure">
+      <span>impossible dates refused <span class="arrow">→</span> <b>12 of 12</b>, 1900 and 2026 February included</span>
+      <span>the plan that was open, after a refusal <span class="arrow">→</span> <b>33 bars, 28 axis labels</b>, unchanged</span>
+      <span>the same file with a real date <span class="arrow">→</span> opens, <b>1 bar</b> — the control</span>
+    </div>
+    <div class="srs">SRS-PERS-041 · <code>tests/unit/dateValidation.test.ts</code>, <code>tests/e2e/open-bad-file.spec.ts</code></div>
+  </section>
+
+  <!-- 3 ------------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">Export · print</div>
+    <h2>Printing puts the whole plan on paper</h2>
+
+    <div class="defect">
+      <h3>The defect</h3>
+      <p>
+        The chart is not a scrollable element: the SVG is exactly the size of
+        the window and the plan moves under it through <code>scrollY</code>. So
+        <code>window.print()</code> printed the window. The rows below the fold
+        were not cut off at the page edge — they were never painted, and
+        nothing said anything was missing. A plan that had been scrolled
+        printed from wherever it had been left.
+      </p>
+    </div>
+
+    <p>
+      Both builds printed to PDF through the same path Ctrl+P takes, at the
+      default page size. The “before” is the committed
+      <code>dist-template/</code> at tag <code>v2.35.0</code>, served on a
+      second port and actually captured:
+    </p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Build</th><th>Window</th><th>Printed pages</th><th>Row names on paper</th></tr></thead>
+        <tbody>
+          <tr><td>v2.35.0, shipped</td><td>1440×900</td><td><b>1</b></td><td><b>20 of 39</b></td></tr>
+          <tr><td>v2.35.0, shipped</td><td>1920×900</td><td><b>1</b></td><td><b>20 of 39</b></td></tr>
+          <tr><td>this tree</td><td>1440×900</td><td><b>2</b></td><td><b>39 of 39</b></td></tr>
+          <tr><td>this tree</td><td>1920×900</td><td><b>1</b></td><td><b>39 of 39</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <figure>
+      <img src="print-light-before.png" alt="The printed sheet from v2.35.0: one page, ending below the eleventh row with no indication that the plan continues.">
+      <figcaption>v2.35.0 — the printed sheet is the window, and the plan simply stops.</figcaption>
+    </figure>
+
+    <figure>
+      <img src="print-light-after.png" alt="The printed sheet from this build: the full plan, every row drawn, continuing past the height of one page.">
+      <figcaption>This build — the sheet is the plan, and the browser paginates it.</figcaption>
+    </figure>
+
+    <p>
+      Growing the sheet is not enough on its own. The shell is
+      <code>100vh</code> with a clipped chart inside it, so a taller SVG is
+      clipped away again unless every box between the page and the chart may
+      grow. And the re-render has to be flushed synchronously: the browser lays
+      the pages out as soon as the <code>beforeprint</code> handler returns, so
+      an ordinary <code>setState</code> — batched into a later task — would be
+      applied after the page had already been captured, and the print would be
+      unchanged.
+    </p>
+
+    <div class="defect">
+      <h3>What this does not do</h3>
+      <p>
+        The calendar axis prints on the first page only. It is painted once at
+        the top of one tall SVG, inside <code>chart-axis-clip</code>, so a plan
+        that needs a second page carries bars there with no dates above them,
+        and the break falls wherever it falls inside a row. Repeating the
+        header per page means emitting one SVG per page rather than one tall
+        one — a larger change than this slice, and in the backlog rather
+        than quietly left out of the requirement.
+      </p>
+    </div>
+
+    <div class="measure">
+      <span>the sheet in a 760px window, before <span class="arrow">→</span> <b>760px</b>, and <b>17 of 39</b> rows on it</span>
+      <span>after <span class="arrow">→</span> <b>1,662px</b>, and <b>39 of 39</b></span>
+      <span>a plan scrolled 1,200px, then printed <span class="arrow">→</span> starts at row <b>1</b></span>
+      <span>after the dialog closes <span class="arrow">→</span> back to the window's height</span>
+      <span>the <code>MARKERS</code> foot band <span class="arrow">→</span> at <b>1,643px</b>, below the last row at <b>1,632</b>, instead of pinned mid-sheet</span>
+    </div>
+    <div class="srs">SRS-EXP-005 · <code>tests/e2e/print-pagination.spec.ts</code></div>
+  </section>
+
+  <hr>
+
+  <!-- dark -------------------------------------------------------------- -->
+  <section class="record">
+    <div class="eyebrow">Both themes</div>
+    <h2>The same sheets in dark</h2>
+    <p>
+      Captured from the same two servers with <code>prefers-color-scheme:
+      dark</code>, so the comparison is the build and not the theme.
+    </p>
+    <figure>
+      <img src="print-dark-before.png" alt="The dark-theme printed sheet from v2.35.0: one page, the plan cut short.">
+      <figcaption>v2.35.0, dark.</figcaption>
+    </figure>
+    <figure>
+      <img src="print-dark-after.png" alt="The dark-theme printed sheet from this build: the full plan across more than one page.">
+      <figcaption>This build, dark.</figcaption>
+    </figure>
+    <figure>
+      <img src="refusal-light.png" alt="A notice reading: wedged.json is not a PowerRoadmap file: tasks[0].start is not a day that exists: 2026-13-45.">
+      <figcaption>The refusal, light — the whole message, in the toast the planner reads. The status bar carries the same text, capped at 44 characters, and the live region announces it in full.</figcaption>
+    </figure>
+    <figure>
+      <img src="refusal-dark.png" alt="The same refusal notice in the dark theme.">
+      <figcaption>The refusal, dark.</figcaption>
+    </figure>
+  </section>
+
+  <hr>
+
+  <!-- review ------------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">After the work was finished</div>
+    <h2>What review found</h2>
+
+    <p>
+      Every fix above was green — typecheck, lint, 501 unit tests and the
+      whole Playwright suite — before any of it had been read by anything
+      other than whoever wrote it. Four reviewers then took one dimension each,
+      and every finding they raised was handed to a separate agent whose
+      instructions were to <em>refute</em> it. Twelve findings, six survived.
+      Three of those six were in the new tests.
+    </p>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>What survived refutation</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td>The updater overwrites the bound file through a <em>second</em> write path, chosen on write permission alone — so the same loss survived behind Settings → Update, and the reload afterwards re-served the old version, because the page being served is not the data file</td><td><code>updateChecker.ts</code></td></tr>
+          <tr><td><code>formatForName</code> answered <code>html</code> for a name with no extension or an unknown one, while the loader reads that class by trying JSON then YAML — leaving exactly the old loss in place for it</td><td><code>fileIo.ts</code></td></tr>
+          <tr><td><code>max-width: 100%</code> on a viewBox-less SVG shrinks the box while the content stays at 1:1, and <code>svg:root</code> clips the rest — so the print fix printed <em>less</em> than before</td><td><code>global.css</code></td></tr>
+          <tr><td><code>expect(shellOverflow).not.toBe('hidden')</code> had no failing state: <code>.app-shell</code> declares no <code>overflow</code> outside the print block</td><td>the print spec</td></tr>
+          <tr><td><code>expect(got).toBeNull()</code> read a value the test itself had written in both branches</td><td>the date spec</td></tr>
+          <tr><td>The restore test passed whether or not printing had ever grown the sheet</td><td>the print spec</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      The third is the one worth dwelling on. The print fix <em>had</em> been
+      measured, and the measurement said three pages with every row name on
+      paper — taken at A4 landscape, where a 1122px page happens to be wide
+      enough that the clipping does not bite. At the page size a planner
+      actually gets, the same build printed <b>23 of 39</b> rows from a 1440px
+      window and <b>16 of 39</b> from 1920px, the right of the timeline cut off
+      in both. A right answer from a lucky instrument is still a wrong
+      measurement.
+    </p>
+
+    <div class="measure">
+      <span>rows printed, <code>max-width: 100%</code> and no viewBox <span class="arrow">→</span> <b>23/39</b> at 1440px, <b>16/39</b> at 1920px</span>
+      <span>dropping the rule <span class="arrow">→</span> <b>39/39</b>, but the timeline clipped at 1920px</span>
+      <span>a viewBox, applied only while printing <span class="arrow">→</span> <b>39/39</b> and the full span, at every width tried</span>
+    </div>
+
+    <p>
+      Each of the five new tests written for these fixes was then run against
+      the code with its fix reverted, and each went red carrying the message it
+      was written to carry, while the controls beside them stayed green. The
+      six refuted findings are recorded too: two rested on the agent bridge,
+      which is compiled out of the product, and two attributed pre-existing
+      behaviour to this change on a before-state that does not hold.
+    </p>
+    <div class="srs">SRS-PERS-040, SRS-EXP-005</div>
+  </section>
+
+  <hr>
+
+  <!-- verification ------------------------------------------------------ -->
+  <section class="record">
+    <h2>Verification</h2>
+    <p>
+      Real numbers, including the failures and the mistakes. Every “before”
+      here was captured from the committed build at tag <code>v2.35.0</code>,
+      served on a second port — not illustrated, not remembered.
+    </p>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Gate</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td><code>tsc --noEmit</code></td><td>clean</td></tr>
+          <tr><td><code>npm run lint</code></td><td>0 errors, 18 warnings (the pre-existing baseline, unchanged)</td></tr>
+          <tr><td><code>npm test</code></td><td>512 passed, 0 failed, across 63 files — 36 of those tests new here</td></tr>
+          <tr><td><code>npm run test:e2e</code>, the three new specs</td><td>24 of 24, on all three projects (desktop, iPad/WebKit, iPhone/WebKit)</td></tr>
+          <tr><td><code>npm run test:e2e</code>, whole suite</td><td>326 passed, <b>2 failed</b>, 239 skipped, across 567 tests and three projects — both failures pre-existing, re-measured below</td></tr>
+          <tr><td><code>npm run build:template</code></td><td>index.html, 429.43 kB (gzip 127.58 kB) — up 1.83 kB on v2.35.0</td></tr>
+          <tr><td>the portable build, opened from the filesystem</td><td>v2.35.1, 33 bars, 39 rows, console clean; printing it puts 39 of 39 rows on the sheet</td></tr>
+          <tr><td>save → delete a bar → reopen, in the built app</td><td><code>.json</code> and <code>.yaml</code> both 33 → 32 → <b>33</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="num">
+      <b>The two failures.</b> Neither is in code this slice changed.
+      <code>dependency-arrows</code> on tablet timed out waiting for Delete
+      dependency in the command bar, and <code>owner-round</code> on mobile
+      committed a drag 2.97px from its preview against a 2px tolerance. Both
+      specs were then repeated five times: 155 runs, 3 failures, all three in
+      the tablet connector-selection tests and none in the drag. So the tablet
+      dependency flake is nearer <b>3 in 15</b> than the “once in
+      fifty” the v2.35.0 showcase recorded — that backlog entry is
+      wrong, not merely open. The suite also force-killed four workers at
+      teardown after the 300s stop timeout.
+    </p>
+    <p class="num">
+      Three of my own test instruments were wrong before they were right, and
+      each was caught by a control rather than by inspection. A dispatched
+      <code>WheelEvent</code> aimed at <code>.chart-area</code> never reached
+      the listener on the SVG below it, and the test said so instead of passing
+      — “the wheel did not scroll the plan, so this test is not measuring
+      anything”. An axis check used <code>.axis-major</code>, a class this app
+      does not have, and read 0 both before and after. And
+      <code>page.mouse.wheel</code> is unimplemented in mobile WebKit, which is
+      two of the three projects. The first full suite run of this slice was also
+      discarded rather than reported: a source file was edited while it was in
+      flight, which hot-reloads every page under test. The clean run then failed
+      twice, correctly — <code>save-roundtrip</code> has a staleness guard, and
+      <code>dist-template/</code> still predated the source changes. Rebuilding
+      it, which the release requires anyway, turned both green. The run also
+      force-killed four workers at teardown after the 300s stop timeout; that is
+      the same teardown problem, and it is in the backlog rather than explained
+      away.
+    </p>
+    <p class="num">
+      One thing recorded in the v2.35.0 showcase is now fixed rather than
+      merely explained: the suite’s five-to-ten-minute teardown. Playwright
+      holds the config’s <code>webServer</code> for the whole run and waits on
+      it at the end — 20 runs of one spec took 19.3s without the block and
+      10.3m with it. <code>PP_NO_WEBSERVER=1</code> now skips it for a local
+      run against a server you started yourself; CI still owns its own.
+    </p>
+  </section>
+
+  <footer>
+    <p>
+      PowerRoadmap v2.35.1 · captured from the running builds, light and dark ·
+      the measurements in this page are the ones the gates run.
+    </p>
+  </footer>
+</div>

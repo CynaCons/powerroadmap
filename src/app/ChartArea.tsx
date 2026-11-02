@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useDocumentStore } from '../stores/documentStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { useSelectionStore } from '../stores/selectionStore';
@@ -40,6 +41,18 @@ export function ChartArea() {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  /**
+   * True while the browser is preparing pages (SRS-EXP-005).
+   *
+   * The chart is not a scrollable element: the SVG is exactly the size of the
+   * window and the plan moves under it through `scrollY`. So printing printed
+   * the window — printed to PDF from the shipped v2.35.0 build, the 39-row
+   * sample came out as one page carrying 19 of its row names, the rest never
+   * painted rather than cut off at the page edge. While this is set
+   * the sheet is as tall as the plan and sits at its top, and the print
+   * stylesheet lets the page break through it.
+   */
+  const [printing, setPrinting] = useState(false);
   const clear = useSelectionStore((s) => s.clear);
 
   const doc = useDocumentStore((s) => s.doc);
@@ -56,6 +69,26 @@ export function ChartArea() {
     ro.observe(el);
     setSize({ width: el.clientWidth, height: el.clientHeight });
     return () => ro.disconnect();
+  }, []);
+
+  /**
+   * Grow the sheet before the browser takes its snapshot (SRS-EXP-005).
+   *
+   * `beforeprint` is synchronous: the browser lays the pages out as soon as
+   * the handler returns, so an ordinary `setState` — which React batches into
+   * a later task — would be applied to the page AFTER it had already been
+   * captured, and the print would be unchanged. `flushSync` is what makes the
+   * re-render land inside the handler.
+   */
+  useEffect(() => {
+    const on = () => flushSync(() => setPrinting(true));
+    const off = () => flushSync(() => setPrinting(false));
+    window.addEventListener('beforeprint', on);
+    window.addEventListener('afterprint', off);
+    return () => {
+      window.removeEventListener('beforeprint', on);
+      window.removeEventListener('afterprint', off);
+    };
   }, []);
 
   // `null` means "nobody has chosen a width": the panel then follows its own
@@ -167,21 +200,37 @@ export function ChartArea() {
    *  transforms, the rule and the pointer arithmetic, so they cannot disagree. */
   const AXIS_TOTAL_H = axis.major.height + axis.minor.height + (axis.micro?.height ?? 0);
 
-  /** Where the chart sheet ends: after the last row and its foot band, or at
-   *  the viewport edge when the plan is taller than the window. */
-  const sheetBottom = Math.min(size.height, AXIS_TOTAL_H + layout.chartHeight + FOOT_BAND_H);
   /** The plot's own height, foot band included — what the clips and the scroll
    *  clamp both have to agree on, or the band is drawn and then cut away. */
   const plotHeight = layout.chartHeight + FOOT_BAND_H;
 
+  /**
+   * How tall the sheet is drawn. The window, normally; the whole plan while
+   * printing, because paper has no fold (SRS-EXP-005). Everything that places
+   * something vertically reads this rather than `size.height`, so the sheet,
+   * the clips, the scroll clamp and the grip cannot disagree about where the
+   * bottom is.
+   */
+  const viewHeight = printing ? AXIS_TOTAL_H + plotHeight : size.height;
+
+  /** Where the chart sheet ends: after the last row and its foot band, or at
+   *  the viewport edge when the plan is taller than the window. */
+  const sheetBottom = Math.min(viewHeight, AXIS_TOTAL_H + layout.chartHeight + FOOT_BAND_H);
+
   // The wheel scrolls the body. A plan that already fits has nothing to
   // scroll, so maxScroll is 0 and the view stays put. The command bar floats
   // over the foot of the chart, so the scroll range carries its height too —
-  // otherwise the last row can never be read.
+  // otherwise the last row can never be read. On paper the whole plan is on
+  // the sheet, so there is no scroll and no chrome to clear.
   const CHROME_H = 52;
-  const bodyHeight = Math.max(0, size.height - AXIS_TOTAL_H - CHROME_H);
+  const bodyHeight = printing ? plotHeight : Math.max(0, size.height - AXIS_TOTAL_H - CHROME_H);
   const maxScroll = Math.max(0, plotHeight - bodyHeight);
-  const scrollY = useViewportStore((s) => s.scrollY);
+  /** What the plan is scrolled to. A page starts at the top of the plan,
+   *  however far the window had been scrolled when Print was pressed. The
+   *  subscription is unconditional — the store keeps its own position, and
+   *  printing only changes what this component draws. */
+  const liveScrollY = useViewportStore((s) => s.scrollY);
+  const scrollY = printing ? 0 : liveScrollY;
 
   /**
    * Bring a just-inserted row into view (SRS-EDIT-028).
@@ -305,7 +354,19 @@ export function ChartArea() {
       <svg
         ref={svgRef}
         width={size.width}
-        height={size.height}
+        height={viewHeight}
+        /* A viewBox, but only on paper (SRS-EXP-005).
+           Without one, `max-width: 100%` in the print stylesheet shrinks the
+           element BOX while the content stays at 1:1 user units, and
+           `svg:root` clips what falls outside — so growing the sheet and then
+           constraining it printed less of the plan than before. Measured on
+           the 39-row sample at the default page size: 23 of 39 rows at a
+           1440px window and 16 of 39 at 1920px, the right of the timeline cut
+           off in both. With the viewBox the printer scales instead of
+           clipping: 39 of 39 rows and the full span at either width.
+           Omitted on screen, where the attributes already equal it, so the
+           scale is 1 and nothing moves. */
+        viewBox={printing ? `0 0 ${size.width} ${viewHeight}` : undefined}
         /* One tab stop, and a name (SRS-EDIT-086). The chart had neither, so
            it was absent from the keyboard entirely — while the picture it
            EXPORTS already carried `role="img"`. Not `img` here: that would
@@ -329,7 +390,7 @@ export function ChartArea() {
         style={{ display: 'block', cursor: dragCursor ?? cursorForTool(activeTool), userSelect: 'none' }}
       >
         {/* Background */}
-        <rect x={0} y={0} width={size.width} height={size.height} fill="var(--color-bg)" />
+        <rect x={0} y={0} width={size.width} height={viewHeight} fill="var(--color-bg)" />
 
         {/*
           The chart is a bounded sheet, not a surface that runs to the bottom of
@@ -544,7 +605,7 @@ export function ChartArea() {
           x={ROW_GUTTER_W - 4}
           y={0}
           width={8}
-          height={size.height}
+          height={viewHeight}
           fill="transparent"
           style={{ cursor: 'col-resize' }}
           onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setDraggingGutter(true); }}

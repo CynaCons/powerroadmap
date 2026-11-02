@@ -2,6 +2,7 @@ import type { GanttDocument } from '../types/document';
 import { injectDocumentInto, buildEmbeddedHtml } from '../persistence/embedded';
 import {
   downloadFile,
+  formatForName,
   getCurrentHandle,
   verifyWritePermission,
   writeHtmlToHandle,
@@ -316,7 +317,15 @@ export async function performUpdate(
     // the updater refusing to update the file you already have open.
     let target: FileSystemFileHandleLike | null = null;
     const handle = handleOf();
-    if (handle && (await verify(handle))) target = handle;
+    // The update writes the APPLICATION, so it may only overwrite a file that
+    // holds the application (SRS-PERS-040). A plan bound to `sprint.json` was
+    // being replaced with 430 KB of `<!doctype html>` under its own name — the
+    // same loss Ctrl+S had, reached from this dialog instead — and because the
+    // page being served is not that file, the reload afterwards re-served the
+    // old version, so the update appeared to do nothing while the original was
+    // already gone. A data file takes the download path, where nothing it
+    // holds is touched.
+    if (handle && formatForName(handle.name) === 'html' && (await verify(handle))) target = handle;
 
     const newHtml = await fetchTemplate(downloadUrl, tag ?? `v${newVersion}`);
     if (!newHtml) return { ok: false };
