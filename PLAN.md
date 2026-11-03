@@ -1170,6 +1170,22 @@ Four questions the prototypes must put in front of the owner, because they are v
 - [x] Settings is reachable from the command palette [agent: claude]
 - [x] The bridge spec notices when another server owns the token file [agent: claude]
 
+### v2.37.0 — Outline-only bars, and rows moved by hand (current) (ACTIVE)
+**Goal:** Bars can be outline only, and rows are moved by hand.
+- [ ] SRS rows for outline-only bars and row reordering
+- [ ] A bar can be drawn with no fill, outline only
+- [ ] Choosing no fill gives an outline so the bar cannot vanish
+- [ ] The outline ink reads in light, dark and print
+- [ ] The context menu supports one level of submenu
+- [ ] The row menu offers one Move with a follow-up
+- [ ] The row menu can add a row above or below
+- [ ] Rows reorder by dragging them in the row list
+- [ ] Dragging a section carries its rows with it
+- [ ] Dragging answers touch as well as the mouse
+- [ ] Unit and e2e tests for the three changes
+- [ ] Cold walkthrough of the row menu and dragging
+- [ ] Showcase artifact with real screenshots
+
 # Backlog (High-level, unscheduled — product & long-horizon only)
 - Cloud / sharing edition
 - Excel/CSV linking, resource swimlanes, baselines, AI assist, collaboration
