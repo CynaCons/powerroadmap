@@ -33,6 +33,9 @@
   --color-deadline: #A2601A;
   --color-weekend: rgba(0, 0, 0, 0.025);
   --color-success: #34d399;
+  /* Carries the bridge status word on a panel, so it clears AA for small
+     text; --color-success is decorative and measures under 2:1 on white. */
+  --color-bridge-on: #15803D;
   --color-overlay-scrim: rgba(15, 23, 42, 0.32);
   --color-inline-editor-bg: rgba(255, 255, 255, 0.92);
   --color-inline-editor-border: rgba(15, 23, 42, 0.2);
@@ -134,6 +137,9 @@
   --color-deadline: #A2601A;
   --color-weekend: rgba(0, 0, 0, 0.025);
   --color-success: #34d399;
+  /* Carries the bridge status word on a panel, so it clears AA for small
+     text; --color-success is decorative and measures under 2:1 on white. */
+  --color-bridge-on: #15803D;
   --color-overlay-scrim: rgba(15, 23, 42, 0.32);
   --color-inline-editor-bg: rgba(255, 255, 255, 0.92);
   --color-inline-editor-border: rgba(15, 23, 42, 0.2);
@@ -178,6 +184,7 @@
   /* See the light theme: a deadline is amber, not the TODAY red. */
   --color-deadline: #D08A3A;
   --color-weekend: rgba(255, 255, 255, 0.025);
+  --color-bridge-on: #5BD68A;
   --color-success: #34d399;
   --color-overlay-scrim: rgba(0, 0, 0, 0.45);
   --color-inline-editor-bg: rgba(0, 0, 0, 0.4);
@@ -212,6 +219,7 @@
   --color-accent-soft: rgba(0, 0, 0, 0.06);
   --color-today: #d00000;
   --color-deadline: #aa6000;
+  --color-bridge-on: #006600;
   --color-weekend: #f3f3f3;
   --color-overlay-scrim: rgba(255, 255, 255, 0.75);
   --color-inline-editor-bg: #ffffff;
@@ -1124,73 +1132,451 @@ kbd {
   justify-content: center;
   z-index: 10000;
 }
-.settings-dialog {
-  width: min(520px, calc(100vw - 32px));
-  max-height: calc(100vh - 64px);
-  overflow-y: auto;
-  background: var(--color-bg-elev);
-  border: 1px solid var(--color-border-hairline);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-3);
-}
-.settings-dialog__head {
+/* Restore offer (SRS-PERS-030). Below the header, not over it: at 375px the
+   old `top: 8` box landed on the Settings gear, which is the way in to every
+   preference including the agent bridge. */
+.restore-banner {
+  position: absolute;
+  top: calc(var(--header-h) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 24px));
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--color-border-soft);
+  gap: 12px;
+  padding: 8px 10px 8px 14px;
+  background: var(--color-bg-elev);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-2);
+  font-size: var(--text-micro);
+  color: var(--color-text);
+  z-index: 100;
 }
-.settings-dialog__head h2 { margin: 0; font-size: var(--text-row); font-weight: 600; }
-.settings-dialog__close {
+.restore-banner__restore {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  font-size: var(--text-micro);
+}
+.restore-banner__dismiss {
+  flex-shrink: 0;
+  padding: 2px;
   background: transparent;
   border: none;
   color: var(--color-text-soft);
   cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius);
+  display: inline-flex;
+  align-items: center;
 }
-.settings-dialog__close:hover { background: var(--color-bg-subtle); }
 
-.settings-section { padding: 16px 18px 20px 18px; }
-.settings-section h3 {
-  margin: 0 0 10px 0;
-  font-size: var(--text-label);
-  font-weight: 600;
+/* Settings — an overlay at 80% of the window: side index on the left, one
+   continuously scrolling page of sections on the right (SRS-SET-001). Ported
+   from PowerScroll's panel; every colour comes from a theme token, because this
+   app has three themes and that one has a single light look (SRS-SET-006). */
+
+.settings-panel {
+  width: 80vw;
+  height: 80vh;
+  min-height: min(520px, calc(100vh - 32px));
+  max-width: calc(100vw - 32px);
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-border-hairline);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   color: var(--color-text);
 }
-.settings-facts {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 14px;
-  margin: 0 0 14px 0;
-  font-size: var(--text-label);
-}
-.settings-facts dt { color: var(--color-text-dim); }
-.settings-facts dd { margin: 0; color: var(--color-text); font-variant-numeric: tabular-nums; }
 
-.settings-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.settings-btn {
+/* ── Header ───────────────────────────────────────────────── */
+
+.settings-panel__header {
+  height: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 10px 0 20px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+.settings-panel__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.settings-panel__title {
+  margin: 0;
+  font-size: var(--text-row);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.settings-panel__context {
+  font-size: var(--text-label);
+  color: var(--color-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.settings-panel__close {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.settings-panel__close:hover {
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+}
+
+/* ── Body: index + scrolling page ─────────────────────────── */
+
+.settings-panel__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.settings-panel__index {
+  width: 216px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 12px 10px;
+  border-right: 1px solid var(--color-border-soft);
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+.settings-panel__index-item {
+  height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-soft);
   font: inherit;
   font-size: var(--text-label);
-  padding: 6px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.settings-panel__index-item:hover {
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+}
+.settings-panel__index-item.is-active,
+.settings-panel__index-item.is-active:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+.settings-panel__index-label { flex: 1; }
+.settings-panel__index-meta {
+  font-size: var(--text-micro);
+  font-weight: 400;
+}
+
+.settings-panel__scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 4px 32px 40px;
+  box-sizing: border-box;
+  /* Each section's offsetTop is measured against this box by the scroll spy. */
+  position: relative;
+}
+
+/* ── Sections ─────────────────────────────────────────────── */
+
+.settings-panel__section {
+  padding-top: 26px;
+  max-width: 760px;
+}
+/* The last section gets room to scroll its heading to the top, so the index
+   can land on it too, however short it is (SRS-SET-003). */
+.settings-panel__section:last-child { min-height: 50%; }
+
+.settings-panel__section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.settings-panel__section-title {
+  margin: 0;
+  font-size: var(--text-row);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.settings-panel__section-desc {
+  margin: 0;
+  font-size: var(--text-label);
+  color: var(--color-text-dim);
+  max-width: 58ch;
+  line-height: 1.5;
+}
+
+.settings-panel__row {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  column-gap: 24px;
+  padding: 14px 0;
+  border-top: 1px solid var(--color-border-soft);
+  font-size: var(--text-label);
+}
+.settings-panel__row-label {
+  font-weight: 500;
+  padding-top: 5px;
+}
+.settings-panel__row-control { min-width: 0; }
+
+.settings-panel__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-top: 3px;
+}
+.settings-panel__hint {
+  font-size: var(--text-micro);
+  line-height: 1.5;
+  color: var(--color-text-dim);
+}
+.settings-panel__hint.is-warn { color: var(--color-deadline); }
+.settings-panel__hint.is-error { color: var(--color-today); }
+.settings-panel__muted { color: var(--color-text-dim); }
+.settings-panel__mono {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: var(--text-label);
+  word-break: break-all;
+}
+.settings-panel__note {
+  margin: 3px 0 0 0;
+  font-size: var(--text-micro);
+  line-height: 1.5;
+  color: var(--color-text-soft);
+}
+.settings-panel__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: var(--text-label);
+  padding-top: 3px;
+}
+.settings-panel__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Controls ─────────────────────────────────────────────── */
+
+/* A choice among named options. The real radio input is stretched invisibly
+   over its tile, which is what keeps arrow keys working inside the group. */
+.settings-panel__choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.settings-panel__tile {
+  position: relative;
+  min-width: 56px;
+  padding: 0 12px;
+  height: 30px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.settings-panel__tile:hover { background: var(--color-bg-subtle); color: var(--color-text); }
+.settings-panel__tile.is-active,
+.settings-panel__tile.is-active:hover {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+.settings-panel__tile:has(.settings-panel__tile-input:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.settings-panel__tile-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.settings-panel__tile-label { pointer-events: none; }
+
+.settings-panel__days { display: flex; gap: 4px; }
+.settings-panel__day {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text-soft);
+  font: inherit;
+  font-size: var(--text-label);
+  cursor: pointer;
+}
+.settings-panel__day:hover { background: var(--color-bg-subtle); color: var(--color-text); }
+.settings-panel__day.is-active {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+.settings-panel__select {
+  font: inherit;
+  font-size: var(--text-label);
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.settings-panel__switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  padding-top: 2px;
+}
+/* A real checkbox drawn as a switch: keeps checkbox semantics and keyboard. */
+.settings-panel__switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 10px;
+  background: var(--color-border);
+  position: relative;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.settings-panel__switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-bg-elev);
+  box-shadow: var(--shadow-1);
+  transition: transform 120ms ease;
+}
+.settings-panel__switch:checked { background: var(--color-accent); }
+.settings-panel__switch:checked::after { transform: translateX(14px); }
+.settings-panel__switch:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.settings-panel__text-input {
+  width: 100%;
+  max-width: 380px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: var(--text-label);
+  box-sizing: border-box;
+}
+
+.settings-panel__btn {
+  font: inherit;
+  font-size: var(--text-label);
+  height: 30px;
+  padding: 0 12px;
   border-radius: var(--radius);
   border: 1px solid var(--color-border);
   background: var(--color-bg);
   color: var(--color-text);
   cursor: pointer;
+  align-self: flex-start;
 }
-.settings-btn:hover:not(:disabled) { background: var(--color-bg-subtle); }
-.settings-btn:disabled { opacity: 0.5; cursor: default; }
-.settings-btn--primary {
+.settings-panel__btn:hover:not(:disabled) { background: var(--color-bg-subtle); }
+.settings-panel__btn:disabled { opacity: 0.5; cursor: default; }
+.settings-panel__btn--primary {
   background: var(--color-accent);
   border-color: var(--color-accent);
-  color: #fff;
+  color: var(--color-bg-elev);
 }
-.settings-note {
-  margin: 12px 0 0 0;
+
+/* ── Footer ───────────────────────────────────────────────── */
+
+.settings-panel__footer {
+  height: 38px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 20px;
+  border-top: 1px solid var(--color-border-soft);
   font-size: var(--text-micro);
-  line-height: 1.5;
-  color: var(--color-text-soft);
+  color: var(--color-text-dim);
+}
+.settings-panel__footer .settings-panel__mono { font-size: var(--text-micro); }
+
+/* ── Phone width: full screen, the index becomes a strip ──── */
+
+@media (max-width: 768px) {
+  .settings-panel {
+    width: calc(100vw - 16px);
+    height: calc(100vh - 16px);
+    max-width: none;
+  }
+  .settings-panel__body { flex-direction: column; }
+  .settings-panel__index {
+    width: auto;
+    flex-direction: row;
+    padding: 8px;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border-soft);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .settings-panel__index-item { flex-shrink: 0; }
+  .settings-panel__index-meta { display: none; }
+  .settings-panel__scroll { padding: 0 16px 28px; }
+  .settings-panel__row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+  }
+  .settings-panel__footer span:first-child { display: none; }
 }
 
 /* New-roadmap chooser (PLAN.md v2.20.0 / SRS-EDIT-017). Shares the settings

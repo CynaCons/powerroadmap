@@ -237,10 +237,25 @@ describe('the bridge actually uses it', () => {
   });
 
   it('attaches the view to every result that reads or changes the document', () => {
-    // get_status, get_view, apply_batch, undo, redo, get_render.
-    expect(bridge.match(/view: viewSummary\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+    // get_status, apply_batch, new_document, reveal, undo, redo, set_viewport.
+    expect(bridge.match(/view: await this\.settledView\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
     // Newline-agnostic: this repo has core.autocrlf on, so the working tree is CRLF.
-    expect(bridge).toMatch(/case 'get_view':\s*return viewSummary\(\);/);
+    expect(bridge).toMatch(/case 'get_view':\s*return this\.settledView\(\);/);
+  });
+
+  it('takes every view through the one wait, so none is taken a frame early', () => {
+    /**
+     * SRS-ABR-037. This used to assert `view: viewSummary()` directly, and that
+     * was exactly the defect: the census ran before React had committed, so the
+     * chart held 34 bars and the agent was told 33.
+     *
+     * Two call sites of the raw function are legitimate and named here — inside
+     * the waiting helper itself, and the pre-write scroll-ceiling read in
+     * `set_viewport`, which is about what is drawn NOW. Any third one is a
+     * report that can describe the frame before its own edit.
+     */
+    expect(bridge.match(/viewSummary\(\)/g)?.length ?? 0).toBe(2);
+    expect(bridge).toMatch(/private async settledView\(\)[\s\S]{0,200}await afterPaint\(/);
   });
 
   it('awaits the dispatch, since rasterising cannot be synchronous', () => {

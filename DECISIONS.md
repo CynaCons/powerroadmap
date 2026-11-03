@@ -265,3 +265,48 @@ things a planner actually repeats.
 **What would reopen it.** A left panel that lists tasks rather than rows. That
 changes what the gutter is, and is a design question of its own rather than a
 place to quietly put the fields back.
+
+## D11 — The agent bridge ships in the app, off by default
+
+**Date:** 2026-11-02 · **Owner directive** (*"make sure the bridge and mcp works
+just like it works in powerscroll. Same exact behaviour please, we nailed it
+down in that other project"*)
+
+**Context.** SRS-ABR-050 kept the bridge out of production and portable builds
+entirely — "the portable build is distributed to third parties; a remote-control
+channel must not travel with it" — enforced by a test that grepped the built
+file for bridge symbols. The toggle was assigned behind `import.meta.env.DEV`,
+so the dynamic import sat in a dead branch and Vite dropped everything it
+reached.
+
+The SRS's own Open items named why this could not simply be relaxed: extending
+past dev "requires a token delivery mechanism that does not depend on the Vite
+dev server". There is none. The portable build is a single file opened from
+disk; its origin is opaque, there is no same-origin server, and SRS-ABR-042
+requires the token to arrive that way.
+
+**Decision.** The bridge ships in every build. It is inert until the planner
+ticks Settings → Agent bridge; that answer lives in this browser's
+`localStorage` and never in the plan, so a roadmap sent to a colleague arrives
+with it off; and the socket is loopback only. A page the server could have
+handed a token to must still present one, so the dev server loses nothing. A
+page it could not is admitted without one.
+
+**Why the old row was wrong rather than merely cautious.** It treated the
+presence of the code as the risk. The risk is a connection, and three
+independently checkable conditions prevent one. Holding the line cost the
+feature entirely: the planner the app is for could not use an agent on their own
+machine, while the requirement was satisfied by a build that did not have it.
+PowerScroll ships the same kind of file to the same kind of third party and
+rests on the same three conditions.
+
+**What this does not defend against.** Another local page dialling the port and
+impersonating the plan — it would receive an agent's commands and could answer
+them freely. That is disclosure and spoofing, not a write into the planner's
+document, and it is inside the bound SRS-ABR-043 already draws. Recorded in the
+backlog; a pairing code read off the panel would close it.
+
+**What would reopen it.** A hosted deployment where the page is served to
+someone other than the planner, or a report of the impersonation above being
+used.
+

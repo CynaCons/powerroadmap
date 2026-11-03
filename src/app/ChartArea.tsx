@@ -56,6 +56,9 @@ export function ChartArea() {
   const clear = useSelectionStore((s) => s.clear);
 
   const doc = useDocumentStore((s) => s.doc);
+  // Stamped on the rendered <svg> so the agent bridge can tell which revision a
+  // census was taken of, instead of counting frames (SRS-ABR-037).
+  const revision = useDocumentStore((s) => s.revision);
   const viewStart = useViewportStore((s) => s.startDate);
   const pxPerDay = useViewportStore((s) => s.pxPerDay);
   const fit = useViewportStore((s) => s.fit);
@@ -355,6 +358,15 @@ export function ChartArea() {
         ref={svgRef}
         width={size.width}
         height={viewHeight}
+        /* Which revision this picture is of (SRS-ABR-037).
+           The bridge reports what is on screen after every call, and it used to
+           take that census two animation frames after writing the store — a
+           guess, and one frame short in practice. Measured by adding a task
+           over the bridge: the chart had 34 bars and the agent was told 33, so
+           every report described the chart as it was BEFORE the edit it was
+           reporting on. Stamping the revision here lets the census wait for the
+           frame that actually holds the change rather than counting frames. */
+        data-pp-revision={revision}
         /* A viewBox, but only on paper (SRS-EXP-005).
            Without one, `max-width: 100%` in the print stylesheet shrinks the
            element BOX while the content stays at 1:1 user units, and

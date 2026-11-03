@@ -1,0 +1,628 @@
+<title>PowerRoadmap v2.36.0</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: one narrow column of records. Each states a defect, then shows the
+     evidence. The measurements are the page's recurring motif — this is an
+     engineering record, so the numbers carry it rather than ornament.
+     Colour and type come from the app's own tokens (src/styles/global.css). */
+  :root {
+    --ground: #FBFBFA;
+    --surface: #FFFFFF;
+    --rule: #D4D4CE;
+    --hair: rgba(0, 0, 0, 0.07);
+    --ink: #1C2430;
+    --ink-soft: #5A6472;
+    --ink-dim: #8A93A0;
+    --accent: #2F4369;
+    --accent-soft: rgba(47, 67, 105, 0.09);
+    --defect: #B3382C;
+    --defect-soft: rgba(179, 56, 44, 0.08);
+    --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #15181F;
+      --surface: #1C212B;
+      --rule: #333A47;
+      --hair: rgba(255, 255, 255, 0.08);
+      --ink: #E8EBF0;
+      --ink-soft: #A7AEBC;
+      --ink-dim: #767E8D;
+      --accent: #8FA6D4;
+      --accent-soft: rgba(143, 166, 212, 0.13);
+      --defect: #E2796C;
+      --defect-soft: rgba(226, 121, 108, 0.12);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #15181F;
+    --surface: #1C212B;
+    --rule: #333A47;
+    --hair: rgba(255, 255, 255, 0.08);
+    --ink: #E8EBF0;
+    --ink-soft: #A7AEBC;
+    --ink-dim: #767E8D;
+    --accent: #8FA6D4;
+    --accent-soft: rgba(143, 166, 212, 0.13);
+    --defect: #E2796C;
+    --defect-soft: rgba(226, 121, 108, 0.12);
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15.5px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 3.5rem 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.5rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 6vw, 2.9rem);
+    line-height: 1.08;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    line-height: 1.25;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  p { margin: 0; max-width: 62ch; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+
+  header .lede {
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    max-width: 58ch;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.4rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink-dim);
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--rule);
+  }
+  .meta b { color: var(--ink-soft); font-weight: 500; }
+
+  header { display: flex; flex-direction: column; gap: 1rem; }
+
+  .record {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    min-width: 0;
+  }
+  .record > .eyebrow { margin-bottom: -0.65rem; }
+
+  .defect {
+    border-left: 3px solid var(--defect);
+    background: var(--defect-soft);
+    padding: 0.85rem 1.1rem;
+    border-radius: 0 6px 6px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+  .defect h3 { color: var(--defect); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; font-family: var(--mono); font-weight: 600; }
+  .defect p { font-size: 0.95rem; color: var(--ink); }
+
+  figure {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+  figure img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    border: 1px solid var(--rule);
+    border-radius: 7px;
+    background: var(--surface);
+  }
+  figcaption {
+    font-size: 0.82rem;
+    color: var(--ink-dim);
+    font-family: var(--mono);
+    line-height: 1.5;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  .trio {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  @media (max-width: 640px) {
+    .pair, .trio { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  .measure {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--hair);
+    border-radius: 7px;
+    padding: 0.9rem 1.1rem;
+    color: var(--ink-soft);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+    overflow-x: auto;
+    font-variant-numeric: tabular-nums;
+  }
+  .measure b { color: var(--ink); font-weight: 600; }
+  .measure .arrow { color: var(--accent); }
+
+  .veto {
+    border: 1px dashed var(--rule);
+    border-radius: 7px;
+    padding: 0.9rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    background: var(--accent-soft);
+    min-width: 0;
+  }
+  .veto h3 { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+  .veto p { font-size: 0.92rem; }
+
+  .srs {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-dim);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    font-variant-numeric: tabular-nums;
+  }
+  th, td { text-align: left; padding: 0.5rem 0.7rem 0.5rem 0; border-bottom: 1px solid var(--hair); }
+  th { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); font-weight: 500; }
+  td.num { font-family: var(--mono); text-align: right; padding-right: 0; white-space: nowrap; }
+  .scroller { overflow-x: auto; min-width: 0; }
+
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">PowerRoadmap v2.36.0</div>
+    <h1>Settings, the agent bridge and the MCP, as PowerScroll does them</h1>
+    <p class="lede">
+      Settings held one section and the agent bridge was not in the app anyone
+      ships. Both are now the shape the owner named: a page of sections with a
+      side index, and a bridge that travels with every build and does nothing
+      until it is asked to.
+    </p>
+    <div class="meta">
+      <span><b>Directive</b> 2026-11-02</span>
+      <span><b>Sections</b> 1 &rarr; 5</span>
+      <span><b>Bridge</b> dev-only &rarr; ships, off by default</span>
+      <span><b>Agents at once</b> 1 &rarr; many, one at a time</span>
+    </div>
+  </header>
+
+  <hr>
+
+  <!-- settings ----------------------------------------------------------- -->
+  <section class="record">
+    <div class="eyebrow">Owner report</div>
+    <h2>&ldquo;It&rsquo;s not matching&rdquo;</h2>
+
+    <div class="defect">
+      <h3>What was wrong</h3>
+      <p>
+        Settings was a 520&times;245 dialog holding one section, About &amp;
+        updates, with two controls in it. It bound no preference and persisted
+        nothing. Everything a planner might look for &mdash; the theme, the
+        weekends, which days are working days &mdash; lived in a context inside
+        the command bar that appears when something is selected, and the agent
+        bridge lived in a header button that production builds did not have.
+        There was nowhere to put a second section, which is why there was never
+        a second section.
+      </p>
+    </div>
+
+    <div class="pair">
+      <figure>
+        <img src="before-light.png" alt="The v2.35.1 settings dialog: one section, two buttons.">
+        <figcaption>v2.35.1, measured &mdash; 520&times;245, 1 section, 2 controls.</figcaption>
+      </figure>
+      <figure>
+        <img src="panel-light.png" alt="The v2.36.0 settings panel: a side index of five sections beside one scrolling page.">
+        <figcaption>v2.36.0 &mdash; 1152&times;720, 5 sections, 5 index entries.</figcaption>
+      </figure>
+    </div>
+
+    <p>
+      The panel is PowerScroll&rsquo;s: one continuously scrolling page beside an
+      index that marks the section you are reading and scrolls to the one you
+      click. Three of its details are there because that app has a comment
+      explaining each of them. The index follows the scroll by the last heading
+      to pass the top of the pane, with a special case at the bottom so the last
+      section can be marked at all. The backdrop closes on the press rather than
+      the click, so a drag that starts on a control and ends outside does not
+      take the panel away. And the final section carries trailing room, because
+      a section shorter than the pane can never scroll its own heading to the
+      top.
+    </p>
+
+    <div class="measure">
+      <span>settings reachable only from the command bar <span class="arrow">&rarr;</span> <b>0</b>, gated per setter and per operation</span>
+      <span>the bar keeps its copy <span class="arrow">&rarr;</span> both write one store field, so neither can show a stale answer</span>
+      <span>ways in <span class="arrow">&rarr;</span> the header gear, and now the command palette under <b>Settings</b></span>
+    </div>
+
+    <div class="veto">
+      <h3>Not copied</h3>
+      <p>
+        PowerScroll hard-codes its greys, because it has one theme. This app has
+        three, and a panel built from literals reads as light-on-light the moment
+        the planner switches. Every colour here is a theme token, including a new
+        one for the bridge&rsquo;s own status word: the existing
+        <code>--color-success</code> is a decorative mint that measures under
+        2:1 on a white panel and cannot carry text.
+      </p>
+    </div>
+
+    <div class="pair">
+      <figure>
+        <img src="panel-dark.png" alt="The same panel in the dark theme.">
+        <figcaption>The same panel, dark theme.</figcaption>
+      </figure>
+      <figure>
+        <img src="panel-phone.png" alt="The panel at phone width, with the index as a scrolling strip above the sections.">
+        <figcaption>390px wide &mdash; the index becomes a strip, rows stack.</figcaption>
+      </figure>
+    </div>
+    <div class="srs">SRS-SET-001 &hellip; SRS-SET-014</div>
+  </section>
+
+  <hr>
+
+  <!-- the bridge ---------------------------------------------------------- -->
+  <section class="record">
+    <div class="eyebrow">Owner report</div>
+    <h2>&ldquo;Don&rsquo;t have the agent bridge option&rdquo;</h2>
+
+    <div class="defect">
+      <h3>What was wrong</h3>
+      <p>
+        It genuinely was not there. The toggle was assigned behind
+        <code>import.meta.env.DEV</code>, which is statically false in a
+        production build, so the dynamic import sat in a dead branch and the
+        whole bridge was dropped from the bundle. A requirement said so
+        &mdash; SRS-ABR-050, &ldquo;no bridge code shall be present in the
+        portable single-file HTML build output&rdquo; &mdash; and a test
+        enforced it by grepping the built file.
+      </p>
+    </div>
+
+    <p>
+      That row treated the <em>presence</em> of the code as the risk. The risk
+      is a <em>connection</em>, and the code cannot make one: it dials nothing
+      until the planner ticks the box, the answer is kept per browser and never
+      in the plan, and the socket is loopback only. Holding the line cost the
+      feature entirely &mdash; the planner the app is for could not use an agent
+      on their own machine, while the requirement was satisfied by a build that
+      simply did not have it. PowerScroll ships the same kind of single file to
+      the same kind of third party and its protection is that the thing does
+      nothing until asked. SRS-ABR-052 says that instead, in three conditions
+      that are each checkable.
+    </p>
+
+    <div class="pair">
+      <figure>
+        <img src="portable-light.png" alt="The agent bridge section: a switch, a green Connected status, the served command count, the attached agent, the server address and a warning.">
+        <figcaption>The switch, the state, what it has served, who is attached, and what enabling it allows.</figcaption>
+      </figure>
+      <figure>
+        <img src="portable-dark.png" alt="The same section in the dark theme.">
+        <figcaption>Same section, dark theme.</figcaption>
+      </figure>
+    </div>
+
+    <div class="veto">
+      <h3>What this does not defend against</h3>
+      <p>
+        There is no token delivery mechanism that works for a file opened from
+        disk: its origin is opaque and there is no same-origin server to serve
+        one from, which is what SRS-ABR-042 requires. So a page that could not
+        have been given a token is admitted without one, and the protection is
+        the loopback bind, the deliberate opt-in and a stated warning. Another
+        local page can therefore dial the same port and impersonate the plan,
+        receiving an agent&rsquo;s commands and answering them with fictions.
+        That is disclosure and spoofing, not a write into the planner&rsquo;s
+        document, and it sits inside the bound SRS-ABR-043 already draws. It is
+        recorded in the backlog, not quietly left out. The token stays mandatory
+        wherever it can be delivered, so the dev server loses nothing.
+      </p>
+    </div>
+    <div class="srs">SRS-ABR-052 (supersedes SRS-ABR-050), SRS-ABR-044, SRS-ABR-006</div>
+  </section>
+
+  <hr>
+
+  <!-- portable proof ------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">Driven, not argued</div>
+    <h2>The file you send someone, taking an agent&rsquo;s edit</h2>
+
+    <p>
+      The e2e suite cannot show this. It serves the app over http, where a token
+      is both mandatory and available &mdash; so the interesting case, the one
+      the whole requirement turns on, is the one it never enters. This is the
+      built single file opened from disk, with the MCP server started by hand,
+      and the agent&rsquo;s own tool call going through it.
+    </p>
+
+    <figure>
+      <img src="portable-chart-light.png" alt="The portable build's chart with a bar labelled 'Added by an agent' on the first row.">
+      <figcaption>
+        The chart in the portable file, immediately after the agent&rsquo;s
+        <code>apply_batch</code> &mdash; no reload, and no token exists on this origin.
+      </figcaption>
+    </figure>
+
+    <div class="measure">
+      <span>page origin <span class="arrow">&rarr;</span> <code>file:</code></span>
+      <span>bars on screen <span class="arrow">&rarr;</span> <b>33</b> <span class="arrow">&rarr;</span> one <code>apply_batch</code> <span class="arrow">&rarr;</span> <b>34</b>, no reload</span>
+      <span>what the agent was told <span class="arrow">&rarr;</span> <b>34</b>, matching the screen</span>
+      <span>panel <span class="arrow">&rarr;</span> <b>Connected</b> &middot; 1 command (last: apply_batch) &middot; Attached: claude</span>
+    </div>
+
+    <div class="defect">
+      <h3>What this run found, that nothing else had</h3>
+      <p>
+        The first attempt connected in one theme and read &ldquo;Another plan
+        took over&rdquo; in the other, with one plan open. Ticking the box starts
+        a dial at the default address; typing an address immediately after stops
+        that instance and starts another &mdash; and the first was already
+        awaiting the token lookup, which <code>connect()</code> did not re-check
+        afterwards. It opened its socket anyway and said hello, the server
+        adopted it as a second page, and the live one was told to stand down. So
+        the page displaced <em>itself</em>, and the next edit went to a socket
+        nobody was reading: 33 bars before an <code>apply_batch</code> that
+        reported success, and 33 after. Both themes connect and apply now, and
+        four unit tests hold the guard in place &mdash; two of them controls, so
+        &ldquo;opened nothing&rdquo; cannot pass against a stub that opens
+        nothing ever.
+      </p>
+    </div>
+    <div class="srs">SRS-ABR-052, SRS-ABR-044, SRS-ABR-001, SRS-ABR-037</div>
+  </section>
+
+  <hr>
+
+  <!-- several agents ------------------------------------------------------ -->
+  <section class="record">
+    <div class="eyebrow">Owner report</div>
+    <h2>&ldquo;The bridge and MCP, same exact behaviour&rdquo;</h2>
+
+    <div class="defect">
+      <h3>What was wrong</h3>
+      <p>
+        One MCP server process is spawned per agent session, so two agents
+        always race for a fixed port. The loser died on
+        <code>EADDRINUSE</code> &mdash; and died holding the MCP transport, so
+        whatever was waiting on <code>initialize</code> never heard back and
+        could not tell that from a bridge that was merely slow. That second
+        agent simply had no bridge.
+      </p>
+    </div>
+
+    <p>
+      PowerScroll&rsquo;s answer is an election: the first process to bind the
+      port owns the page connection and every later one joins it as a peer over
+      that same port, forwarding its tool calls. Exactly one socket reaches the
+      page, so the page needs no notion of several servers, and there is one
+      obvious place to hold the lease. Agents may connect freely but may not
+      write at the same time: a call takes the lease for its duration plus a
+      short idle grace, so a turn of several batches is atomic in practice, and
+      a refused agent is told who holds it and for how long. Reads never take
+      it, because an agent waiting must still be able to find out what it is
+      waiting for.
+    </p>
+
+    <div class="measure">
+      <span>second server process <span class="arrow">&rarr;</span> <b>joins as a peer</b>, instead of exiting 1</span>
+      <span>its tool call <span class="arrow">&rarr;</span> forwarded to the hub, served by the one page socket</span>
+      <span>a write while another holds the lease <span class="arrow">&rarr;</span> <b>LOCKED</b>, naming the holder and the queue position</span>
+      <span><code>get_status</code> while blocked <span class="arrow">&rarr;</span> answers, and reports the lease</span>
+      <span>a second page connects <span class="arrow">&rarr;</span> the first is told to stand down, then closed</span>
+    </div>
+
+    <p>
+      The displacement order is load-bearing rather than polite. Without the
+      stand-down frame the displaced page&rsquo;s reconnect backoff fires, it
+      displaces the newcomer in turn, and the two trade the connection
+      indefinitely while each command lands in whichever page happens to hold
+      it. All of this is driven as two real processes against a hand-rolled page
+      client, because none of it is observable from inside one module.
+    </p>
+    <div class="srs">SRS-ABR-070, SRS-ABR-071, SRS-ABR-072, SRS-ABR-073, SRS-ABR-007</div>
+  </section>
+
+  <hr>
+
+  <!-- live view ----------------------------------------------------------- -->
+  <section class="record">
+    <div class="eyebrow">Owner report, mid-slice</div>
+    <h2>&ldquo;Updated live on the UI without having a need to refresh&rdquo;</h2>
+
+    <p>
+      The screen was already live. Measured on a running page: adding a task
+      over the bridge put the bar on the chart and the count in the status bar
+      with no reload, because the bridge mutates the same stores the app
+      renders from. The <em>report</em> was not.
+    </p>
+
+    <div class="defect">
+      <h3>What was wrong</h3>
+      <p>
+        <code>apply_batch</code> took its census of what is on screen
+        synchronously, immediately after writing the store, before React had
+        committed anything. The three methods that did wait counted two
+        animation frames &mdash; a guess, and one frame short here, because the
+        commit lands on a scheduler callback that runs after both. So every
+        report described the chart as it had been <em>before</em> the edit being
+        reported on, and <code>get_render</code> would have returned a picture
+        of the old plan. An agent that cannot see its own edit re-applies it.
+      </p>
+    </div>
+
+    <div class="measure">
+      <span>add one task, chart on screen <span class="arrow">&rarr;</span> <b>34 bars</b>, status bar &ldquo;34 tasks&rdquo;, no reload</span>
+      <span>what the agent was told, before <span class="arrow">&rarr;</span> <b>33</b> &mdash; &ldquo;17 of 33 task elements are off screen&rdquo;</span>
+      <span>after <span class="arrow">&rarr;</span> <b>34</b> &mdash; &ldquo;18 of 34 task elements are off screen&rdquo;</span>
+      <span>undo, immediately after <span class="arrow">&rarr;</span> <b>33</b> again</span>
+    </div>
+
+    <p>
+      Counting frames was the mistake, so the fix does not count them better.
+      The chart stamps the revision it drew onto its own <code>&lt;svg&gt;</code>
+      and the census waits for that number, bounded so a page that is never
+      going to catch up still answers rather than hanging. Every view an agent
+      reads now goes through that one wait, which a source-level gate asserts:
+      exactly two calls to the raw census survive, and both are named.
+    </p>
+    <div class="srs">SRS-ABR-037</div>
+  </section>
+
+  <hr>
+
+  <!-- walkthrough --------------------------------------------------------- -->
+  <section class="record">
+    <div class="eyebrow">Cold walkthrough</div>
+    <h2>What approaching it fresh found</h2>
+
+    <div class="defect">
+      <h3>The restore banner sat on the Settings gear</h3>
+      <p>
+        On a 375px phone the offer to restore an unsaved session rendered at
+        <code>top: 8</code> as a 187&times;114 box and landed squarely on the
+        header&rsquo;s right-hand controls.
+        <code>document.elementFromPoint</code> aimed at the centre of the gear
+        returned the banner. So the one control that now leads to every
+        preference, the agent bridge included, could not be reached on a phone
+        until the banner was dismissed &mdash; and the banner is the first thing
+        a returning planner sees. On a desktop it missed by luck: the box is
+        centred and narrow and the buttons are at the right edge.
+      </p>
+    </div>
+
+    <div class="measure">
+      <span>gear at 375px, before <span class="arrow">&rarr;</span> <code>elementFromPoint</code> = the banner</span>
+      <span>after <span class="arrow">&rarr;</span> the gear, with the banner below the header</span>
+      <span>banner width at 375px <span class="arrow">&rarr;</span> <b>187px</b> over four lines <span class="arrow">&rarr;</span> <b>351px</b></span>
+    </div>
+
+    <p>
+      The width was a second bug under the first: with <code>left: 50%</code>
+      and no explicit width, shrink-to-fit is capped by the space from the
+      centre to the right edge, so <code>max-width</code> could never widen it.
+      Two of the e2e tests written for the panel failed on tablet and mobile
+      only, and both failures were worth having: one was this banner
+      intercepting the click, and the other was an assertion of mine that only
+      held on a desktop.
+    </p>
+  </section>
+
+  <hr>
+
+  <!-- verification -------------------------------------------------------- -->
+  <section class="record">
+    <div class="eyebrow">Verification</div>
+    <h2>What was run, and what it said</h2>
+
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Gate</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td><code>tsc -b --force</code></td><td>clean</td></tr>
+          <tr><td><code>eslint src mcp tests</code></td><td>0 errors, 17 warnings &mdash; all pre-existing</td></tr>
+          <tr><td><code>npm test</code></td><td>553 passed, 0 failed, across 68 files &mdash; 41 of those tests new here</td></tr>
+          <tr><td><code>npm run test:e2e</code>, whole suite</td><td>358 passed, 7 failed, 241 skipped &mdash; the skips are the pointer-and-desktop-only tests gating themselves off tablet and mobile. Every one of the 7 was a crashed WebKit target, not a defect: re-run alone, the same 7 specs gave 69 passed, 0 failed.</td></tr>
+          <tr><td><code>npm run build:template</code></td><td>index.html, 464.91 kB (gzip 137.94 kB) &mdash; up 35.48 kB on v2.35.1&rsquo;s shipped 429.43 kB</td></tr>
+          <tr><td>the bridge, driven as two processes</td><td>hub election, peer forwarding, lease, idle release, displacement, origin refusal</td></tr>
+          <tr><td>a live page, driven over MCP</td><td>add a task &rarr; 34 bars on screen and 34 in the report, no reload; undo &rarr; 33</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="num">
+      <b>The build grew by 35 kB.</b> That is the bridge, which now ships: the
+      client, the protocol, the feedback module that serialises and rasterises
+      the chart, and the panel that turns it on. It was previously tree-shaken
+      out of the portable file entirely, so this is the cost of the feature
+      existing where the planner can reach it rather than a regression to
+      explain away.
+    </p>
+
+    <p class="num">
+      <b>New tests.</b> 42 unit tests in six new files &mdash; the
+      server&rsquo;s topology driven as two real processes (9), the wait that
+      makes a report describe its own edit (7), bridge consent and what the
+      panel is told (12), the build-output gate inverted from absent to
+      present-and-inert (5), the self-displacement guard (4), and the
+      chrome-against-panel parity gate (5) &mdash; plus 12 panel tests in a real
+      browser on each of three projects, and two more on the bridge spec. Two
+      tests went with the old requirement: the build-output gate was rewritten
+      rather than relaxed, and it was run red against the committed v2.35.1
+      template first, failing on all three literals, which is the before-state
+      it asserts. Eight of the forty-two are controls that exist so the test
+      beside them cannot pass vacuously.
+    </p>
+
+    <p class="num">
+      <b>The failures, named.</b> The first run came back red on <code>open-bad-file</code>, <code>owner-round</code>, <code>review-fixes</code>, <code>row-ops</code> and <code>selection-bar</code> (twice) on tablet, and on <code>touch-and-targets</code> on mobile &mdash; one of them reporting <code>Target crashed</code> outright. The cause was the harness, not the app: this suite leaks one <code>WebKitNetworkProcess</code> per browser context and never reaps it. 129 of them had taken the machine down to 0.7&nbsp;GB free of 15.8&nbsp;GB, which kills browsers under whatever test happens to be running. Killed, and re-run with two workers instead of six, those six specs and the mobile one gave <b>69 passed, 0 failed</b>. They are named here rather than summarised as a count, because a count is what a red suite looks like when nobody looked &mdash; and the leak is now on the backlog, since a gate that starves itself is a gate that will miss a real defect next time.
+    </p>
+  </section>
+
+</div>

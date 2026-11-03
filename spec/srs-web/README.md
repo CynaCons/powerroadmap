@@ -25,6 +25,7 @@ shared layer even if only one currently implements it.
 | File | Feature tag | Covers |
 |------|-------------|--------|
 | [SRS-agent-bridge.md](SRS-agent-bridge.md) | `ABR` | The MCP agent bridge: an agent driving the live web app's document, and the safety properties that must hold while it does. |
+| [SRS-settings.md](SRS-settings.md) | `SET` | The settings panel: one scrolling page of sections with a side index, and the place every preference is reachable from. |
 
 ## Trace
 

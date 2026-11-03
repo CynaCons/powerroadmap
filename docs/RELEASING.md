@@ -23,10 +23,20 @@ Do not release merely because a version-looking file changed. First work out
 which deployed surface consumes it.
 
 **Not surfaces yet.** PowerRoadmap publishes nothing to npm and nothing to the
-MCP Registry. The `powerplanner-web` agent bridge is dev-only by construction
-and is stripped from production and portable builds. If the bridge ever ships as
-an installable package, this runbook gains those two surfaces and their
-ordering rules — see PowerScroll's runbook for the shape.
+MCP Registry. If the `powerplanner-web` agent bridge ever ships as an
+installable package, this runbook gains those two surfaces and their ordering
+rules — see PowerScroll's runbook for the shape.
+
+**The bridge ships inside the app.** Since v2.36.0 the agent bridge travels with
+every build, the portable single file included (SRS-ABR-052, superseding
+SRS-ABR-050). It is inert until the planner ticks Settings → Agent bridge, that
+answer is kept per browser and never in the plan, and the socket is loopback
+only. Two things follow for a release. The build-output gate now asserts that
+the bridge IS present rather than absent, so a build that drops it fails
+`tests/unit/bridgeShipped.test.ts`. And the MCP server in `mcp/agent-bridge/` is
+no longer dev scaffolding: changing its tool surface changes what every
+installed copy can be driven to do, so it is a release-worthy change in its own
+right and belongs in the notes.
 
 ## Invariants
 

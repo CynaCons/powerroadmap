@@ -48,13 +48,15 @@ import {
   Zap,
   GitCompare,
   FilePlus2,
+  Settings as SettingsIcon,
+  Bot,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 interface Command {
   id: string;
   label: string;
-  group: 'Create' | 'Tools' | 'Scale' | 'View' | 'Theme' | 'File' | 'Templates' | 'Edit' | 'Help';
+  group: 'Create' | 'Tools' | 'Scale' | 'View' | 'Theme' | 'Settings' | 'File' | 'Templates' | 'Edit' | 'Help';
   icon?: LucideIcon;
   shortcut?: string;
   keywords?: string;
@@ -397,6 +399,28 @@ function useCommands(close: () => void): Command[] {
   cmds.push({ id: 'theme-dark', label: 'Theme: Dark', group: 'Theme', icon: Moon, run: run(() => setTheme('dark')) });
   cmds.push({ id: 'theme-light', label: 'Theme: Light', group: 'Theme', icon: Sun, run: run(() => setTheme('light')) });
   cmds.push({ id: 'theme-print', label: 'Theme: Print (high-contrast)', group: 'Theme', icon: Printer, run: run(() => setTheme('print')) });
+
+  // SETTINGS
+  //
+  // The panel is now where every preference lives, and the gear was the only
+  // way in — no shortcut, no palette entry. A planner looking for "the agent
+  // bridge" or "working days" types the word, not the icon.
+  cmds.push({
+    id: 'open-settings',
+    label: 'Settings…',
+    group: 'Settings',
+    icon: SettingsIcon,
+    keywords: 'preferences options theme weekends working days bridge agent mcp update version about file saving',
+    run: run(() => useViewStore.getState().setSettingsOpen(true)),
+  });
+  cmds.push({
+    id: 'open-settings-bridge',
+    label: 'Agent bridge (MCP)…',
+    group: 'Settings',
+    icon: Bot,
+    keywords: 'mcp agent bridge connect claude codex let an agent edit',
+    run: run(() => useViewStore.getState().setSettingsOpen(true)),
+  });
 
   // FILE
   cmds.push({ id: 'file-save', label: 'Save', group: 'File', icon: Save, shortcut: shortcutFor('save'), keywords: 'embed html', run: run(() => { void saveCurrent(); }) });

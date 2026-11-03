@@ -49,11 +49,39 @@ export interface HelloMessage {
   type: 'hello';
   protocolVersion: number;
   clientId: string;
-  token: string;
+  /**
+   * Absent when the page has no way to obtain one: the portable build is a file
+   * opened from disk, with no same-origin server to serve a token from
+   * (SRS-ABR-044). The server still requires it from any page that has one.
+   */
+  token?: string;
   href: string;
   title: string;
   revision: number;
 }
+
+/**
+ * Sent to a page the server is about to disconnect because another page has
+ * claimed the connection (SRS-ABR-007).
+ *
+ * This frame exists to stop a flip-flop: without it the displaced page's
+ * reconnect backoff fires, it displaces the newcomer in turn, and the two trade
+ * the connection indefinitely while each command lands in whichever page
+ * happens to hold it. A displaced page must stand down and NOT retry.
+ */
+export interface DisplacedMessage {
+  type: 'displaced';
+  reason: string;
+}
+
+/** Agents attached to the bridge, pushed whenever the set changes (SRS-ABR-073). */
+export interface AgentsMessage {
+  type: 'agents';
+  agents: Array<{ label: string; role: string; connectedAt: number }>;
+}
+
+/** Frames the server pushes outside of call/result. */
+export type ControlMessage = DisplacedMessage | AgentsMessage;
 
 export interface CallMessage {
   type: 'call';
@@ -85,7 +113,10 @@ export interface EventMessage {
 }
 
 export type ClientMessage = HelloMessage | ResultMessage | EventMessage;
-export type ServerMessage = CallMessage;
+export type ServerMessage = CallMessage | ControlMessage;
+
+/** Loopback only — the bridge must never be reachable off this machine. */
+export const DEFAULT_BRIDGE_URL = `ws://127.0.0.1:${DEFAULT_BRIDGE_PORT}/agent`;
 
 /** Params for `apply_batch`, the workhorse method. */
 export interface ApplyBatchParams {

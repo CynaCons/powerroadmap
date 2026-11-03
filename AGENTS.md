@@ -221,10 +221,15 @@ it is all-or-nothing, so an invalid operation changes nothing. Supply ids
 yourself; later operations may reference entities created by earlier ones in the
 same batch. Never move the viewport as a side effect of editing.
 
-Dev-only by construction: dropped from production and portable builds, gated by
-`tests/unit/bridge-build-isolation.test.ts`. Design:
-[`docs/web-agent-bridge-plan.md`](docs/web-agent-bridge-plan.md). Requirements:
-[`spec/srs-web/SRS-agent-bridge.md`](spec/srs-web/SRS-agent-bridge.md).
+Ships in every build, the portable single file included, and is inert until the
+planner ticks **Settings → Agent bridge** (SRS-ABR-052, gated by
+`tests/unit/bridgeShipped.test.ts`). So "no page is connected" is the normal
+state, not a broken one: `get_status` answers regardless and names the route.
+Several agents share one port — the first MCP process to bind it owns the page
+connection and the rest forward through it — and a write takes a lease, so a
+second agent is refused with `LOCKED` and told who holds it. Reads are never
+blocked. Design: [`docs/web-agent-bridge-plan.md`](docs/web-agent-bridge-plan.md).
+Requirements: [`spec/srs-web/SRS-agent-bridge.md`](spec/srs-web/SRS-agent-bridge.md).
 
 ## Release
 

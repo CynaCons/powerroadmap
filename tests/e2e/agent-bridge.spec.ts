@@ -22,8 +22,13 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /**
- * One loopback port per worker, clear of the 5199 default so a dev bridge can
- * stay running alongside the suite.
+ * One loopback port per worker, clear of the 5199 default so a dev bridge is
+ * not displaced by the suite.
+ *
+ * It does not follow that a dev bridge can be left running: the port is per
+ * worker, and `.powerplanner-bridge.json` — which is what actually sends the
+ * page to a port — is one file per repo. `assertPageWillReachUs` below is
+ * what notices.
  *
  * A single fixed port was enough while this file ran on its own, and it is not
  * enough once the whole suite runs with several workers: Playwright is free to
@@ -86,6 +91,40 @@ class McpClient {
     await Promise.race([this.request('initialize', {}), died]);
     // Give the WebSocket listener a moment to bind before the page connects.
     await new Promise((r) => setTimeout(r, 300));
+    await this.assertPageWillReachUs();
+  }
+
+  /**
+   * Fail now if the page would be sent to a different bridge.
+   *
+   * `BRIDGE_PORT` keeps two servers off one socket. It does nothing about
+   * `.powerplanner-bridge.json`: there is one per repo, every bridge server
+   * rewrites it whenever it is asked to do work, and the dev server hands
+   * whatever it says to the page. So a bridge running for real — a dev
+   * session, an editor's MCP host, a second copy of this suite — can point the
+   * page at its own port in the middle of this run. The page connects there,
+   * that server already has a page, the newer one wins, and this test reads
+   * "Another plan took over" with a single plan open.
+   *
+   * It cost two full runs to learn that from the inside: a 15s timeout on
+   * `data-status=connected`, reported against whichever test happened to be
+   * running, with nothing in the message about the real cause.
+   *
+   * Asking the dev server what it will tell the page checks the path the page
+   * actually takes, instead of this process's idea of it — so it stays right
+   * if the token file moves or the dev server was reused from an earlier run.
+   * Nothing here can recover from a mismatch, so it is named and thrown.
+   */
+  private async assertPageWillReachUs(): Promise<void> {
+    const response = await fetch('http://localhost:5180/__agent-token');
+    const session = (await response.json()) as { port?: number; error?: string };
+    if (session.port === BRIDGE_PORT) return;
+    const reached = session.port ?? `none (${session.error ?? response.status})`;
+    throw new Error(
+      `the dev server will send the page to port ${reached}, not this test's ${BRIDGE_PORT}: ` +
+        'another bridge server owns .powerplanner-bridge.json. Stop any dev bridge or second ' +
+        'test run before running this spec.',
+    );
   }
 
   request(method: string, params: unknown): Promise<{
@@ -122,9 +161,25 @@ class McpClient {
   }
 }
 
+/**
+ * Turn the bridge on the way a planner does: Settings → Agent bridge.
+ *
+ * The header button this used to click is gone (v2.36.0). The bridge lives in
+ * the panel now, as it does in PowerScroll, which is also the only place that
+ * reports what it has served and who is attached. The address field is left
+ * empty on purpose, so the client resolves the port the server published —
+ * these tests run on 5219 + worker index, not the default.
+ */
 async function connectBridge(page: Page): Promise<void> {
   await page.goto('/');
-  await page.getByRole('button', { name: /agent/i }).click();
+  await page.getByRole('button', { name: 'Settings, about and updates' }).click();
+  await page.getByTestId('settings-panel').waitFor({ state: 'visible' });
+  await page.getByTestId('settings-index-bridge').click();
+  await page.getByTestId('settings-bridge-toggle').check();
+  await expect(page.getByTestId('settings-bridge-status')).toHaveAttribute('data-status', 'connected', {
+    timeout: 15_000,
+  });
+  await page.keyboard.press('Escape');
   // Narrowed to the agent chip: the status bar now also carries the one
   // live region that reports file and edit outcomes (SRS-PERS-025).
   await expect(page.locator('.app-status .agent-indicator')).toContainText('agent connected', { timeout: 10_000 });
@@ -169,9 +224,26 @@ test.describe('web agent bridge', () => {
   });
 
   test('reports NO_CLIENT before any page connects (SRS-ABR-004)', async () => {
-    const { isError, payload } = await mcp.call('get_status');
+    // A tool that needs the document still refuses, and the refusal names the
+    // route that connects one (SRS-ABR-066). The old text said "switch the
+    // Agent toggle on", which named a header button production builds did not
+    // have — an instruction an agent could not follow.
+    const { isError, payload } = await mcp.call('get_document');
     expect(isError).toBe(true);
     expect(payload.error).toBe('NO_CLIENT');
+    expect(String(payload.message)).toContain('Settings');
+    expect(String(payload.message)).toContain('Agent bridge');
+  });
+
+  test('but get_status still answers, so an agent can find out why (SRS-ABR-072)', async () => {
+    // This used to be the NO_CLIENT case too, and that was the defect: the one
+    // tool whose whole job is to say what is going on refused to say it. An
+    // agent could not tell "nothing is attached" from "the server is not there".
+    const { isError, payload } = await mcp.call('get_status');
+    expect(isError).toBe(false);
+    expect(payload.connected).toBe(false);
+    expect((payload.bridge as { role: string }).role).toBe('hub');
+    expect((payload.bridge as { lease: { held: boolean } }).lease.held).toBe(false);
   });
 
   test('authors a 12-task plan that actually renders (SRS-ABR-010)', async ({ page }) => {
@@ -475,10 +547,23 @@ test.describe('web agent bridge', () => {
 
   test('disconnecting from the UI ends the session immediately (SRS-ABR-061)', async ({ page }) => {
     await connectBridge(page);
-    await page.getByRole('button', { name: /agent on/i }).click();
+
+    // The same control that granted it revokes it, which is the whole point of
+    // SRS-ABR-061 — and since v2.36.0 that control is the switch in the panel.
+    await page.getByRole('button', { name: 'Settings, about and updates' }).click();
+    await page.getByTestId('settings-index-bridge').click();
+    await page.getByTestId('settings-bridge-toggle').uncheck();
+    await expect(page.getByTestId('settings-bridge-status')).toHaveAttribute('data-status', 'off');
     await expect(page.locator('.app-status .agent-indicator')).toHaveCount(0);
 
-    const { isError, payload } = await mcp.call('get_status');
+    // `get_status` still answers — it is the tool that says what is going on —
+    // but it now says nothing is attached, and a tool needing the document
+    // refuses (SRS-ABR-072, SRS-ABR-004).
+    const status = await mcp.call('get_status');
+    expect(status.isError).toBe(false);
+    expect(status.payload.connected).toBe(false);
+
+    const { isError, payload } = await mcp.call('get_document');
     expect(isError).toBe(true);
     expect(payload.error).toBe('NO_CLIENT');
   });

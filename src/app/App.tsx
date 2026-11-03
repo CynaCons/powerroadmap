@@ -11,6 +11,7 @@ import { CommandPalette } from './CommandPalette';
 import { NewRoadmapDialog } from './NewRoadmapDialog';
 import { DetailsDialog } from './DetailsDialog';
 import { useDocumentStore } from '../stores/documentStore';
+import { initBridge } from '../agent/bridgeInit';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { readEmbeddedDocument } from '../persistence/embedded';
 import { autosaveToFile, restoreBinding } from '../persistence/fileIo';
@@ -107,6 +108,12 @@ export function App({ compact = false }: AppProps) {
   // with its own idea of what a modifier means. They are entries in the keymap
   // now, so there is one listener and one declaration (SRS-EDIT-040).
   useKeyboardShortcuts();
+
+  // Follow the planner's bridge consent (SRS-ABR-052). This ships in every
+  // build, portable included, and dials nothing until the box in Settings is
+  // ticked — a flag that starts false and lives only in this browser, so a
+  // plan sent to someone else arrives with the bridge off (SRS-ABR-006).
+  useEffect(() => initBridge(), []);
 
   return (
     <div className={compact ? 'app-shell app-shell--compact' : 'app-shell'}>

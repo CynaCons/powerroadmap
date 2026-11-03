@@ -5,21 +5,7 @@ import { shortcutFor } from './keymap';
 import { Undo2, Redo2, Magnet, HelpCircle, Settings } from 'lucide-react';
 import { ExportMenu } from './ExportMenu';
 import { BrandLogo } from './BrandLogo';
-import { lazy, Suspense } from 'react';
-import { SettingsDialog } from './SettingsDialog';
-
-/**
- * Agent bridge toggle — dev builds only.
- *
- * `import.meta.env.DEV` is statically false in production, so the dynamic
- * import sits in a dead branch and the whole bridge is dropped from the bundle
- * rather than merely hidden (SRS-ABR-050; gated by a build-output test).
- */
-const AgentBridgeToggle = import.meta.env.DEV
-  ? lazy(() =>
-      import('../agent/AgentBridgeToggle').then((m) => ({ default: m.AgentBridgeToggle })),
-    )
-  : null;
+import { SettingsPanel } from './SettingsPanel';
 
 export function Header() {
   const title = useDocumentStore((s) => s.doc.title);
@@ -96,14 +82,9 @@ export function Header() {
           icon={<HelpCircle size={14} strokeWidth={1.75} />}
           phoneHide
         />
-        {AgentBridgeToggle && (
-          <Suspense fallback={null}>
-            <AgentBridgeToggle />
-          </Suspense>
-        )}
         <ExportMenu />
       </div>
-      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </header>
   );
 }

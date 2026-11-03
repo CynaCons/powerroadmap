@@ -69,6 +69,13 @@ explicitly.
 > portable builds. That is false as designed: §6/T3 makes the client
 > `import.meta.env.DEV`-only, so it does not exist in those builds at all. v1 is
 > **dev-only**, deliberately. The remaining reasons above still hold.
+>
+> **Superseded in v2.36.0** (owner directive 2026-11-02, "same exact behaviour"
+> as PowerScroll). The bridge now ships in every build and is inert until the
+> planner turns it on; the token stays mandatory wherever a page can be served
+> one, and a page opened from disk is admitted without it on a loopback socket.
+> See SRS-ABR-052 and SRS-ABR-044 for the reasoning and for what that does not
+> defend against.
 
 ---
 

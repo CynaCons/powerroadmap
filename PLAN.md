@@ -1146,6 +1146,30 @@ Four questions the prototypes must put in front of the owner, because they are v
 - [x] Scale the printed chart instead of clipping it [agent: claude]
 - [x] Replace three assertions that could not fail [agent: claude]
 
+### v2.36.0 — Settings, the bridge and the MCP, as PowerScroll does them (COMPLETE)
+**Goal:** Settings, the agent bridge and the MCP behave the way PowerScroll's do.
+- [x] SRS rows for the sectioned settings panel [agent: claude]
+- [x] SRS rows superseding the dev-only bridge requirement [agent: claude]
+- [x] Bridge consent stored in this browser, off by default [agent: claude]
+- [x] Bridge client handles displacement, backoff and presence [agent: claude]
+- [x] The bridge ships in the portable build behind consent [agent: claude]
+- [x] Sectioned settings panel with a side index [agent: claude]
+- [x] Look and input sections bound to the existing stores [agent: claude]
+- [x] Saving section shows the bound file and its state [agent: claude]
+- [x] Agent bridge section with status, count and address [agent: claude]
+- [x] About and updates section matching PowerScroll's wording [agent: claude]
+- [x] The MCP server hosts a hub and accepts peers [agent: claude]
+- [x] A lease stops two agents writing at once [agent: claude]
+- [x] Agent presence reaches the app and is shown [agent: claude]
+- [x] Unit and e2e tests for the panel and the bridge [agent: claude]
+- [x] Cold walkthrough of settings and the bridge [agent: claude]
+- [x] Showcase artifact with real screenshots [agent: claude]
+- [x] An agent's edit shows on screen without a refresh [agent: claude]
+- [x] A stopped bridge no longer opens a socket and displaces itself [agent: claude]
+- [x] The restore offer stops covering the header on a phone [agent: claude]
+- [x] Settings is reachable from the command palette [agent: claude]
+- [x] The bridge spec notices when another server owns the token file [agent: claude]
+
 # Backlog (High-level, unscheduled — product & long-horizon only)
 - Cloud / sharing edition
 - Excel/CSV linking, resource swimlanes, baselines, AI assist, collaboration
@@ -1210,3 +1234,10 @@ See git for full historical web iterations (v0–v2).
 - Check dates on the write side, not only on read
 - Fall back to matchMedia print where beforeprint does not fire
 - Stop the suite force-killing workers at teardown
+- set_style_preset is an operation no UI reaches and nothing reads
+- A local page can dial the bridge port and impersonate the plan
+- The lease queue reports an order it does not enforce
+- A task bar can be drawn as an outline only, solid or dashed
+- The row menu offers one Move, and adding a row below
+- Rows reorder by dragging them in the row list
+- The e2e harness reaps its browser processes instead of starving the machine

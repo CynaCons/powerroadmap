@@ -24,21 +24,51 @@ import { DocOpError } from '../stores/docOps';
 // Serialising, rasterising and the on-screen census live next door so they can
 // be tested without a socket; `exportSvg()` in src/persistence/fileIo.ts cannot
 // be reused for any of it because it triggers a download (design review F7).
-import { renderChart, viewSummary } from './feedback';
+import { renderChart, viewSummary, type ViewSummary } from './feedback';
 import { startDocument } from '../app/documentActions';
 
+/** How many frames the census waits for the chart to catch up before giving up. */
+const RENDER_WAIT_FRAMES = 30;
+
 /**
- * Resolve after the browser has painted the next frame.
+ * Resolve once the chart on screen is the revision the caller just wrote.
  *
  * Scrolling and revealing are applied by a React effect in `ChartArea`, so a
  * summary taken synchronously after the store write describes the frame BEFORE
- * the move. Two frames, because the effect that scrolls runs on the render the
- * store change schedules, and the geometry is only right after that render has
- * been painted.
+ * the move. The first version waited two animation frames for that, which is a
+ * guess — and one frame short in practice. Measured by adding a task over the
+ * bridge against a live page: the chart had 34 bars and the agent was told 33,
+ * because React commits the store change on a scheduler callback that lands
+ * after both frames. Every report therefore described the chart as it had been
+ * BEFORE the edit being reported on, which is worse than no report.
+ *
+ * So this waits for the thing itself: `ChartArea` stamps the revision it drew
+ * onto the `<svg>`, and the loop runs until that matches, then gives the
+ * browser one more frame to paint it. Bounded, because a page that is never
+ * going to catch up must still answer (SRS-ABR-037).
  */
-function afterPaint(): Promise<void> {
+export function afterPaint(expectedRevision?: number): Promise<void> {
   return new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    let frames = 0;
+    const drawn = () => {
+      const svg = document.querySelector<SVGSVGElement>('.chart-area svg');
+      // No chart at all (the compact task pane, a test harness): nothing to
+      // wait for, so do not spend 30 frames discovering that.
+      if (!svg) return true;
+      const stamped = svg.dataset.ppRevision;
+      if (stamped === undefined) return true;
+      return expectedRevision === undefined || Number(stamped) >= expectedRevision;
+    };
+    const tick = () => {
+      if (drawn() || frames >= RENDER_WAIT_FRAMES) {
+        // One more frame, so the geometry read is of a painted picture.
+        requestAnimationFrame(() => resolve());
+        return;
+      }
+      frames += 1;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   });
 }
 import {
@@ -48,7 +78,9 @@ import {
   type BridgeErrorCode,
   type CallMessage,
   type ResultMessage,
+  type ServerMessage,
 } from './protocol';
+import { useBridgeStore } from '../stores/bridgeStore';
 
 /** Bounded replay cache for idempotent retries (SRS-ABR-023). */
 const OP_CACHE_LIMIT = 128;
@@ -101,50 +133,158 @@ export class AgentBridge {
   private async connect(): Promise<void> {
     // The bridge server publishes BOTH the token and the port it actually bound
     // to, so an explicitly-configured port (tests, a second bridge) is picked up
-    // without the page having to be told separately.
+    // without the page having to be told separately. A page opened from disk
+    // gets neither, and connects without a token (SRS-ABR-044).
     const session = await fetchSession();
-    const port = this.options.port ?? session.port ?? DEFAULT_BRIDGE_PORT;
+    /**
+     * Abandon if the bridge was stopped while that was in flight.
+     *
+     * Without this a stopped instance still opens a socket, and the server
+     * adopts whatever says hello — so the page displaces ITSELF. Observed while
+     * driving the portable build: ticking the box starts a dial at the default
+     * address, typing an address immediately after stops that instance and
+     * starts another, and the first one's `fetchSession` had not resolved yet.
+     * It then connected, the server took it as a second page, and the live one
+     * was told to stand down. The panel read "Another plan took over" with only
+     * one plan open, and the agent's edit went nowhere.
+     */
+    if (this.closedByUser) return;
 
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/agent`);
+    const url = this.addressFor(session.port);
+
+    useBridgeStore.getState().setStatus('connecting');
+
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(url);
+    } catch (err) {
+      useBridgeStore
+        .getState()
+        .setStatus('error', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
     this.socket = socket;
 
     socket.onopen = () => {
+      // Belt to the check above: a socket this instance no longer owns must not
+      // announce itself, or it claims the connection on behalf of nobody.
+      if (this.closedByUser || this.socket !== socket) {
+        socket.close();
+        return;
+      }
       this.reconnectDelay = 500;
       const state = useDocumentStore.getState();
       this.send({
         type: 'hello',
         protocolVersion: BRIDGE_PROTOCOL_VERSION,
         clientId: this.clientId,
-        token: session.token,
+        ...(session.token ? { token: session.token } : {}),
         href: location.href,
         title: state.doc.title,
         revision: state.revision,
       });
       state.setAgentActive(true);
+      useBridgeStore.getState().setStatus('connected');
       this.options.onStatusChange?.(true);
     };
 
     socket.onmessage = (event) => {
-      let call: CallMessage;
+      let frame: ServerMessage;
       try {
-        call = JSON.parse(String(event.data)) as CallMessage;
+        frame = JSON.parse(String(event.data)) as ServerMessage;
       } catch {
+        return; // unparseable frame — no id to answer, nothing to say
+      }
+
+      // Control frames first: neither is a call, and `displaced` must be acted
+      // on before the close handler can schedule a reconnect.
+      if (frame?.type === 'displaced') {
+        this.standDown(frame.reason || 'Another plan took the connection');
         return;
       }
-      if (call?.type !== 'call') return;
+      if (frame?.type === 'agents') {
+        useBridgeStore.getState().setAgents(Array.isArray(frame.agents) ? frame.agents : []);
+        return;
+      }
+
+      if (frame?.type !== 'call') return;
+      const call = frame;
       // `get_render` rasterises, which cannot be synchronous. Nothing else
       // awaits, and the server issues one call at a time per client, so the
       // `lastSeenUserRevision` bookkeeping below is not racing itself.
-      void this.handleCall(call).then((result) => this.send(result));
+      void this.handleCall(call).then((result) => {
+        this.send(result);
+        // Counted on success only, so the panel's number means "served",
+        // not "attempted" (SRS-ABR-065).
+        if (result.ok) useBridgeStore.getState().noteCommand(call.method);
+      });
     };
 
     socket.onclose = () => {
       useDocumentStore.getState().setAgentActive(false);
       this.options.onStatusChange?.(false);
-      if (!this.closedByUser) this.scheduleReconnect();
+      if (this.closedByUser) return;
+      /**
+       * A failure already declared is not overwritten by the next attempt.
+       *
+       * Reporting 'connecting' here unconditionally is what made SRS-ABR-063's
+       * defect: the backoff keeps dialling a port nothing is listening on, each
+       * close rewrites the status, and the reason the give-up timer wrote is
+       * gone within a second. Measured here against a bridge that was not
+       * answering: the panel read "Waiting for agent server…" indefinitely with
+       * the explanation already computed and thrown away. The retry loop still
+       * runs — only the wording holds still until something actually answers.
+       */
+      if (useBridgeStore.getState().status !== 'error') {
+        useBridgeStore.getState().setStatus('connecting');
+      }
+      this.scheduleReconnect();
     };
 
+    // Deliberately no status here. Browsers put no useful detail on a socket
+    // error event, and a server that is merely starting produces one on every
+    // attempt — declaring failure is the give-up timer's job, which waits long
+    // enough to mean it.
     socket.onerror = () => socket.close();
+  }
+
+  /**
+   * Where to dial. A planner-typed address wins; otherwise the port the server
+   * published, then the default. The store holds the empty string until someone
+   * types one, so the default is resolved here rather than persisted.
+   */
+  private addressFor(publishedPort?: number): string {
+    const typed = useBridgeStore.getState().url.trim();
+    if (typed) return typed;
+    const port = this.options.port ?? publishedPort ?? DEFAULT_BRIDGE_PORT;
+    return `ws://127.0.0.1:${port}/agent`;
+  }
+
+  /**
+   * Stop for good — another page has claimed the connection (SRS-ABR-007).
+   *
+   * Deliberately does NOT schedule a reconnect: retrying is exactly what causes
+   * the flip-flop this frame exists to prevent. The persisted consent is
+   * cleared too, so a forgotten background tab cannot silently re-claim the
+   * connection after a reload; re-ticking the box takes it back.
+   */
+  private standDown(reason: string): void {
+    this.closedByUser = true;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    if (this.socket) {
+      this.socket.onclose = null;
+      this.socket.onerror = null;
+      this.socket.close();
+      this.socket = null;
+    }
+    useDocumentStore.getState().setAgentActive(false);
+    this.options.onStatusChange?.(false);
+    const store = useBridgeStore.getState();
+    store.setEnabled(false);
+    // AFTER setEnabled: that call unwinds through the store subscription and
+    // stops the bridge, which would otherwise overwrite this with 'off'.
+    store.setStatus('displaced', reason);
   }
 
   private scheduleReconnect(): void {
@@ -221,7 +361,18 @@ export class AgentBridge {
     return result;
   }
 
-  private dispatch(call: CallMessage): unknown | Promise<unknown> {
+  /**
+   * The view, taken once the chart has drawn the revision the store now holds.
+   *
+   * Every report an agent reads goes through here, so none of them can describe
+   * the chart as it was before the call being reported on (SRS-ABR-037).
+   */
+  private async settledView(): Promise<ViewSummary> {
+    await afterPaint(useDocumentStore.getState().revision);
+    return viewSummary();
+  }
+
+  private async dispatch(call: CallMessage): Promise<unknown> {
     const params = (call.params ?? {}) as Record<string, unknown>;
     const store = useDocumentStore.getState();
 
@@ -245,7 +396,7 @@ export class AgentBridge {
           // What the person is actually looking at, not just what exists
           // (SRS-ABR-035). An agent that never reads this can author a chart
           // nobody can see.
-          view: viewSummary(),
+          view: await this.settledView(),
         };
       }
 
@@ -253,12 +404,19 @@ export class AgentBridge {
         return store.doc;
 
       case 'get_view':
-        return viewSummary();
+        return this.settledView();
 
-      case 'get_render':
+      case 'get_render': {
         // Evidence to show the user (SRS-ABR-031), and now also something the
         // AGENT can see (SRS-ABR-033/034). Must not trigger a download.
-        return renderChart().then((render) => ({ ...render, view: viewSummary() }));
+        //
+        // The wait comes FIRST: the raster is taken from the live DOM, so
+        // rendering before the chart has drawn the current revision hands the
+        // agent a picture of the plan as it was.
+        const view = await this.settledView();
+        const render = await renderChart();
+        return { ...render, view };
+      }
 
       case 'apply_batch': {
         const { ops, expectedRevision } = params as unknown as ApplyBatchParams;
@@ -268,7 +426,7 @@ export class AgentBridge {
         return {
           applied: ops.length,
           revision: useDocumentStore.getState().revision,
-          view: viewSummary(),
+          view: await this.settledView(),
         };
       }
 
@@ -285,7 +443,7 @@ export class AgentBridge {
         // still name ids that no longer exist, and starts the plan clean rather
         // than dirty and undoable. This is the same call the UI's New makes.
         startDocument(validated);
-        return { title: validated.title, view: viewSummary() };
+        return { title: validated.title, view: await this.settledView() };
       }
 
       /**
@@ -308,16 +466,16 @@ export class AgentBridge {
         // plot height, the body height and therefore the scroll ceiling — so
         // this asks for the row and then waits for that pass to run.
         useViewportStore.getState().reveal(rowId);
-        return afterPaint().then(() => ({ revealed: rowId, view: viewSummary() }));
+        return { revealed: rowId, view: await this.settledView() };
       }
 
       case 'undo':
         store.undo('agent');
-        return { revision: useDocumentStore.getState().revision, view: viewSummary() };
+        return { revision: useDocumentStore.getState().revision, view: await this.settledView() };
 
       case 'redo':
         store.redo('agent');
-        return { revision: useDocumentStore.getState().revision, view: viewSummary() };
+        return { revision: useDocumentStore.getState().revision, view: await this.settledView() };
 
       case 'set_viewport': {
         const vp = useViewportStore.getState();
@@ -333,12 +491,13 @@ export class AgentBridge {
           vp.scrollBy(scrollY - current, current + below);
         }
         const after = useViewportStore.getState();
-        return afterPaint().then(() => ({
+        const view = await this.settledView();
+        return {
           startDate: after.startDate,
           pxPerDay: after.pxPerDay,
           scrollY: useViewportStore.getState().scrollY,
-          view: viewSummary(),
-        }));
+          view,
+        };
       }
 
       case 'fit_to_tasks': {
@@ -389,13 +548,27 @@ export class AgentBridge {
  * (SRS-ABR-042). A foreign origin cannot read it, which is what makes it useful
  * behind the server's origin allowlist.
  */
-async function fetchSession(): Promise<{ token: string; port?: number }> {
-  const response = await fetch('/__agent-token');
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(`agent bridge unavailable (${response.status}) ${detail}`.trim());
+async function fetchSession(): Promise<{ token?: string; port?: number }> {
+  // A page served from disk has no same-origin server, so there is no endpoint
+  // to ask and no token to be had (SRS-ABR-044). `fetch` of a relative URL from
+  // `file://` rejects rather than returning a status, so both arms degrade to
+  // "no token" instead of failing the connection: the server admits a page it
+  // could not have given one to, and still demands it from every page it could.
+  if (location.protocol === 'file:') return {};
+
+  let response: Response;
+  try {
+    response = await fetch('/__agent-token');
+  } catch {
+    return {};
   }
-  const body = (await response.json()) as { token?: string; port?: number };
-  if (!body.token) throw new Error('agent token missing from response');
+  if (!response.ok) {
+    // 503 is the normal state while the bridge server is down, and on a built
+    // page served over http there is no middleware at all, so the endpoint is
+    // whatever the host serves for an unknown path. Neither is a reason to
+    // refuse to dial: the server decides whether a tokenless page is allowed.
+    return {};
+  }
+  const body = (await response.json().catch(() => ({}))) as { token?: string; port?: number };
   return { token: body.token, port: body.port };
 }

@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-// @ts-expect-error - plain ESM with no build step, imported for its behaviour
 import { FrameReader, decodeFrame, encodeFrame, OPCODE } from '../../mcp/agent-bridge/frames.mjs';
 
 /**
@@ -124,7 +123,7 @@ describe('the bridge reassembles a fragmented message (SRS-ABR-034)', () => {
   it('round-trips both length forms, and sets FIN on what the server sends', () => {
     for (const size of [10, 200, 70_000]) {
       const frame = encodeFrame('z'.repeat(size));
-      const decoded = decodeFrame(frame);
+      const decoded = decodeFrame(frame)!;
       expect(decoded.payload.toString('utf8')).toHaveLength(size);
       expect(decoded.fin).toBe(true);
       expect(decoded.opcode).toBe(OPCODE.text);
@@ -132,6 +131,6 @@ describe('the bridge reassembles a fragmented message (SRS-ABR-034)', () => {
   });
 
   it('can encode a pong, which the old encoder hardcoded to text', () => {
-    expect(decodeFrame(encodeFrame('hb', OPCODE.pong)).opcode).toBe(OPCODE.pong);
+    expect(decodeFrame(encodeFrame('hb', OPCODE.pong))!.opcode).toBe(OPCODE.pong);
   });
 });

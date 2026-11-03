@@ -111,7 +111,7 @@ describe('the updater will not replace a data file with the app (SRS-PERS-040)',
 
 describe('what the dialog promises matches what happens', () => {
   it('does not claim an in-place update for a data file', async () => {
-    // The wording is chosen in SettingsDialog from the same question
+    // The wording is chosen in SettingsPanel from the same question
     // performUpdate asks. Asserted here through the module rather than the
     // DOM, because the status string is what the planner reads.
     const { formatForName } = await vi.importActual<typeof import('../../src/persistence/fileIo')>(

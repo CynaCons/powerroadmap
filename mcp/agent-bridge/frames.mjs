@@ -16,6 +16,8 @@
  * told TIMEOUT: a transport error reported for a protocol gap.
  */
 
+import { randomBytes } from 'node:crypto';
+
 /** Text frames the browser sends are masked; frames the server sends are not. */
 export function decodeFrame(buf) {
   if (buf.length < 2) return null;
@@ -49,27 +51,45 @@ export function decodeFrame(buf) {
   return { fin, opcode, payload, consumed: offset + length };
 }
 
-/** `opcode` defaults to text; pass 0xa to answer a ping. */
-export function encodeFrame(text, opcode = 0x1) {
+/**
+ * `opcode` defaults to text; pass 0xa to answer a ping.
+ *
+ * `mask` must be true for a frame sent as a CLIENT and false as a server: RFC
+ * 6455 §5.1 requires client frames to be masked and forbids it for server
+ * frames, and a conforming peer closes the connection either way round. The
+ * bridge needs both, because one MCP process hosts the port and the others dial
+ * it as peers (SRS-ABR-070).
+ */
+export function encodeFrame(text, opcode = 0x1, { mask = false } = {}) {
   const payload = Buffer.from(text, 'utf8');
   const length = payload.length;
   const first = 0x80 | opcode;
+  const lengthByte = mask ? 0x80 : 0x00;
   let header;
 
   if (length < 126) {
-    header = Buffer.from([first, length]);
+    header = Buffer.from([first, lengthByte | length]);
   } else if (length < 65536) {
     header = Buffer.alloc(4);
     header[0] = first;
-    header[1] = 126;
+    header[1] = lengthByte | 126;
     header.writeUInt16BE(length, 2);
   } else {
     header = Buffer.alloc(10);
     header[0] = first;
-    header[1] = 127;
+    header[1] = lengthByte | 127;
     header.writeBigUInt64BE(BigInt(length), 2);
   }
-  return Buffer.concat([header, payload]);
+
+  if (!mask) return Buffer.concat([header, payload]);
+
+  // The key is not a secret and buys no security — masking exists to stop
+  // intermediaries mistaking a frame for an HTTP request. Random is required
+  // regardless, and the payload is XORed in place against a copy.
+  const key = randomBytes(4);
+  const masked = Buffer.from(payload);
+  for (let i = 0; i < masked.length; i++) masked[i] ^= key[i % 4];
+  return Buffer.concat([header, key, masked]);
 }
 
 export const OPCODE = { continuation: 0x0, text: 0x1, binary: 0x2, close: 0x8, ping: 0x9, pong: 0xa };

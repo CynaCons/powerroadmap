@@ -7,6 +7,19 @@
  *   - a WebSocket server bound to LOOPBACK ONLY, which the browser page
  *     connects out to.
  *
+ * SEVERAL AGENTS (SRS-ABR-070). One MCP server process is spawned per agent
+ * session, so several of them race for the same port. The winner becomes the
+ * HUB and owns the single page connection; the losers become PEERS and forward
+ * their tool calls to the hub over that same loopback port. Exactly one socket
+ * reaches the page, so the page needs no notion of multiple servers, and there
+ * is one obvious place to hold the lease.
+ *
+ * Agents may connect freely but may not write concurrently: the hub hands out a
+ * lease, held for a call and for a short idle grace after it (SRS-ABR-071). A
+ * refused agent is told who holds it and when to retry. Read-only tools bypass
+ * the lease, because looking while someone writes is harmless and refusing it
+ * would leave a blocked agent unable to find out why (SRS-ABR-072).
+ *
  * It is a relay with schemas. It deliberately holds NO document state: the
  * browser's Zustand store is the single source of truth, which is the property
  * that makes agent edits and user edits incapable of desyncing
@@ -16,6 +29,7 @@
  */
 
 import { createServer } from 'node:http';
+import { connect } from 'node:net';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { writeFileSync, unlinkSync, readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -45,6 +59,50 @@ const ALLOWED_ORIGINS = new Set(
 
 const SESSION_TOKEN = randomBytes(32).toString('hex');
 
+/** This process's id, used only to arbitrate the lease between processes. */
+const AGENT_ID = randomBytes(4).toString('hex');
+
+/**
+ * The agent's own name, when its environment gives one. Never invented: a
+ * generated name changes on every restart, so one agent that reconnects would
+ * show up to the planner as a crowd of strangers.
+ */
+const ENV_AGENT_NAME = (() => {
+  const raw = (process.env.POWERPLANNER_AGENT_NAME ?? '').trim();
+  if (!raw) return null;
+  if (!/^[a-z0-9][a-z0-9._-]{0,39}$/.test(raw)) {
+    process.stderr.write(
+      `[powerplanner-bridge] POWERPLANNER_AGENT_NAME "${raw}" is not a valid name ` +
+        '(^[a-z0-9][a-z0-9._-]{0,39}$); ignoring it.\n',
+    );
+    return null;
+  }
+  return raw;
+})();
+
+/** How this process is listed to other processes and in get_status. */
+const AGENT_LABEL = ENV_AGENT_NAME ?? `unnamed-${AGENT_ID}`;
+
+/** How long after its last call a lease survives, so a turn of several batches is atomic. */
+const LOCK_IDLE_MS = Number(process.env.POWERPLANNER_LOCK_IDLE_MS ?? 10_000);
+/** After this, a holder yields at its next call boundary — but only if someone waits. */
+const LOCK_MAX_HOLD_MS = Number(process.env.POWERPLANNER_LOCK_MAX_HOLD_MS ?? 120_000);
+
+/**
+ * Tools that only look. They bypass the lease (SRS-ABR-072): a blocked agent
+ * must still be able to read, and above all to call `get_status` and find out
+ * what it is blocked on.
+ */
+const READ_ONLY = new Set(['get_status', 'get_document', 'get_view', 'get_render']);
+
+/** When this process came up, so presence can say how long an agent has been there. */
+const STARTED_AT = Date.now();
+
+/** 'starting' until the port race is settled, then 'hub' or 'peer'. */
+let mode = 'starting';
+/** Set when startup failed for a reason the planner has to fix. */
+let startupError = null;
+
 /* ------------------------------------------------------------------ */
 /* Tool surface                                                        */
 /* ------------------------------------------------------------------ */
@@ -61,7 +119,7 @@ const TOOLS = [
   {
     name: 'get_status',
     description:
-      'Bridge and document status: whether a browser client is attached, how many, the document title, current revision, and entity counts. Call this first — it distinguishes "nothing connected" from "connected to an empty document".',
+      'Bridge and document status: whether a plan is attached, which agents are on the bridge, who holds the write lease and for how much longer, plus the document title, revision and entity counts. Answers even when nothing is attached and even while another agent holds the lease, so it is always the way to find out what is going on. Call it first — it distinguishes "nothing connected" from "connected to an empty plan".',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -183,7 +241,10 @@ const TOOLS = [
           items: {
             type: 'object',
             properties: {
-              kind: { type: 'string', enum: ['task', 'milestone', 'bracket', 'dependency', 'marker'] },
+              // Every kind `SelectableKind` admits. 'row' was missing, so an agent
+              // could not select the one thing a planner selects most — and the
+              // schema refused the call before the page ever saw it.
+              kind: { type: 'string', enum: ['task', 'milestone', 'bracket', 'dependency', 'marker', 'row'] },
               id: { type: 'string' },
             },
             required: ['kind', 'id'],
@@ -204,11 +265,116 @@ const MUTATING = new Set(['apply_batch', 'new_document', 'undo', 'redo']);
 
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
-/** @type {Set<{socket: import('node:net').Socket, id: string, meta: object, lastSeen: number}>} */
-const clients = new Set();
+/**
+ * The one page the bridge drives, or null.
+ *
+ * A set with a `clientId` argument was the first design (SRS-ABR-005), and it
+ * made the agent answer a question only the planner can: which of their open
+ * tabs they are looking at. A stale tab from an earlier session is a perfectly
+ * valid choice by every test the server can apply. Newest connection wins
+ * instead, and the one it displaces is told to stand down (SRS-ABR-007).
+ *
+ * @type {{socket: import('node:net').Socket, id: string, meta: object, lastSeen: number} | null}
+ */
+let page = null;
+/** Other MCP processes forwarding through this one. @type {Map<object, {agentId: string, label: string, connectedAt: number}>} */
+const peers = new Map();
 let nextCallId = 1;
-/** @type {Map<number, {resolve: Function, timer: NodeJS.Timeout}>} */
+/** @type {Map<number, {resolve: Function, reject: Function, timer: NodeJS.Timeout}>} */
 const pending = new Map();
+
+/**
+ * The lease. `inFlight` is what stops it expiring underneath a slow call: a
+ * render rasterises before it can answer, and an idle-only timer would hand the
+ * plan to someone else in the middle of one.
+ */
+let lock = { holder: null, label: null, inFlight: 0, idleUntil: 0, since: 0 };
+/** agentIds waiting, oldest first. Reported, so a blocked agent knows where it stands. */
+const waiting = [];
+
+class Locked extends Error {}
+
+function releaseLock(why) {
+  if (!lock.holder) return;
+  log(`lock released by ${lock.label} (${why})`);
+  lock = { holder: null, label: null, inFlight: 0, idleUntil: 0, since: 0 };
+}
+
+/**
+ * Expiry is evaluated on use rather than on a timer: a timer that fires while
+ * nothing is happening tells us nothing, and one that fires mid-call would be
+ * wrong anyway.
+ */
+function currentHolder(now = Date.now()) {
+  if (lock.holder && lock.inFlight === 0 && now > lock.idleUntil) releaseLock('idle');
+  return lock.holder;
+}
+
+function lockStatus(now = Date.now()) {
+  const holder = currentHolder(now);
+  return {
+    held: !!holder,
+    holder: holder ? lock.label : null,
+    retryAfterMs: holder ? Math.max(0, lock.idleUntil - now) : 0,
+    heldForMs: holder ? now - lock.since : 0,
+    waiting: waiting.length,
+  };
+}
+
+/** Grants the lease, or explains who has it and for how much longer. */
+function acquireLock(agentId, label) {
+  const now = Date.now();
+  const holder = currentHolder(now);
+
+  if (holder && holder !== agentId) {
+    if (!waiting.includes(agentId)) waiting.push(agentId);
+    const st = lockStatus(now);
+    throw new Locked(
+      `Another agent is editing this plan. "${st.holder}" holds it and has been working for ` +
+        `${Math.round(st.heldForMs / 1000)}s; it frees up after about ` +
+        `${Math.ceil(st.retryAfterMs / 1000)}s of inactivity. Do other work and retry, or call ` +
+        `get_status to check. You are queued at position ${waiting.indexOf(agentId) + 1}.`,
+    );
+  }
+
+  // A long holder yields at a call boundary, but only when someone is actually
+  // waiting — otherwise a long solo task would interrupt itself for nothing.
+  if (holder === agentId && now - lock.since > LOCK_MAX_HOLD_MS && waiting.length > 0) {
+    const n = waiting.length;
+    releaseLock('max hold reached with agents waiting');
+    throw new Locked(
+      `You have held this plan for over ${Math.round(LOCK_MAX_HOLD_MS / 1000)}s and ${n} ` +
+        'agent(s) are waiting, so the lease was handed on. Retry to queue for it again.',
+    );
+  }
+
+  const queued = waiting.indexOf(agentId);
+  if (queued >= 0) waiting.splice(queued, 1);
+
+  if (!holder) {
+    lock = { holder: agentId, label, inFlight: 0, idleUntil: now + LOCK_IDLE_MS, since: now };
+    log(`lock acquired by ${label}`);
+  }
+  lock.inFlight += 1;
+  return function release() {
+    lock.inFlight = Math.max(0, lock.inFlight - 1);
+    lock.idleUntil = Date.now() + LOCK_IDLE_MS;
+  };
+}
+
+/** Fail every call in flight now, rather than letting each one time out. */
+function rejectPending(message) {
+  for (const [id, entry] of pending) {
+    clearTimeout(entry.timer);
+    pending.delete(id);
+    entry.reject(bridgeFailure('NO_CLIENT', message));
+  }
+}
+
+function log(...parts) {
+  // stdout is the MCP transport; every log goes to stderr.
+  process.stderr.write(`[powerplanner-bridge] ${parts.join(' ')}\n`);
+}
 
 function tokenMatches(provided) {
   const a = createHash('sha256').update(String(provided ?? '')).digest();
@@ -221,9 +387,25 @@ const httpServer = createServer((req, res) => {
   res.writeHead(404).end();
 });
 
+/**
+ * True when the request comes from a page that could not have been given a
+ * token (SRS-ABR-044).
+ *
+ * A single-file build opened from disk has an opaque origin — browsers send
+ * `Origin: null`, or omit it — and there is no same-origin server to serve a
+ * token from, which SRS-ABR-042 requires. An MCP peer process sends no Origin
+ * either, and local code running as the planner is outside the threat model by
+ * SRS-ABR-043. What is still refused is a page on a real origin that is not
+ * allowed: that is the attacker SRS-ABR-040 names.
+ */
+function cannotHoldToken(origin) {
+  return origin === undefined || origin === 'null' || origin === '';
+}
+
 httpServer.on('upgrade', (req, socket) => {
   const origin = req.headers.origin;
-  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+  const tokenless = cannotHoldToken(origin);
+  if (!tokenless && !ALLOWED_ORIGINS.has(origin)) {
     socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
     socket.destroy();
     return;
@@ -244,7 +426,7 @@ httpServer.on('upgrade', (req, socket) => {
       `Sec-WebSocket-Accept: ${accept}\r\n\r\n`,
   );
 
-  const client = { socket, id: null, meta: {}, lastSeen: Date.now() };
+  const client = { socket, id: null, meta: {}, lastSeen: Date.now(), tokenless, kind: null };
 
   // Fragmentation, masking and control frames are the codec's problem;
   // see mcp/agent-bridge/frames.mjs for why that is a module of its own.
@@ -264,12 +446,32 @@ httpServer.on('upgrade', (req, socket) => {
     }
   });
 
-  const drop = () => {
-    clients.delete(client);
-  };
+  const drop = () => dropConnection(client);
   socket.on('close', drop);
   socket.on('error', drop);
 });
+
+function dropConnection(client) {
+  if (client.kind === 'peer') {
+    const info = peers.get(client);
+    peers.delete(client);
+    if (info) {
+      // A peer that goes away must not keep the plan leased.
+      if (lock.holder === info.agentId) releaseLock('peer disconnected');
+      const queued = waiting.indexOf(info.agentId);
+      if (queued >= 0) waiting.splice(queued, 1);
+      log(`peer "${info.label}" disconnected; ${peers.size} peer(s)`);
+    }
+    pushAgents();
+    return;
+  }
+  if (page === client) {
+    page = null;
+    // The plan going away invalidates any lease over it.
+    releaseLock('page disconnected');
+    log('page disconnected');
+  }
+}
 
 function handleClientMessage(client, raw, socket) {
   let message;
@@ -279,8 +481,31 @@ function handleClientMessage(client, raw, socket) {
     return;
   }
 
+  // A peer MCP process announces itself before anything else; the page says
+  // 'hello'. Both arrive on the same port, which is the whole point of the
+  // election (SRS-ABR-070).
+  if (message.type === 'peer-hello') {
+    client.kind = 'peer';
+    peers.set(client, {
+      agentId: String(message.agentId ?? '').slice(0, 32),
+      label: String(message.label ?? 'unnamed'),
+      connectedAt: Date.now(),
+    });
+    log(`peer "${message.label}" connected; ${peers.size} peer(s)`);
+    socket.write(encodeFrame(JSON.stringify({ type: 'peer-welcome', hub: AGENT_LABEL })));
+    pushAgents();
+    return;
+  }
+
+  if (client.kind === 'peer' && message.type === 'peer-request') {
+    void handlePeerRequest(client, message);
+    return;
+  }
+
   if (message.type === 'hello') {
-    if (!tokenMatches(message.token)) {
+    // A page that could have been handed a token must present the right one; a
+    // page that could not is admitted without one (SRS-ABR-044).
+    if (!client.tokenless && !tokenMatches(message.token)) {
       socket.write(encodeFrame(JSON.stringify({ type: 'event', kind: 'bye', reason: 'bad token' })));
       socket.end();
       return;
@@ -292,10 +517,11 @@ function handleClientMessage(client, raw, socket) {
       socket.end();
       return;
     }
+    client.kind = 'page';
     client.id = message.clientId;
     client.meta = { href: message.href, title: message.title, revision: message.revision };
     client.lastSeen = Date.now();
-    clients.add(client);
+    adoptPage(client);
     return;
   }
 
@@ -310,31 +536,118 @@ function handleClientMessage(client, raw, socket) {
   }
 
   if (message.type === 'event' && message.kind === 'bye') {
-    clients.delete(client);
+    dropConnection(client);
     socket.end();
   }
 }
 
-/** Resolve which client a call targets (SRS-ABR-004/005). */
+/**
+ * Make this page the one the bridge drives, displacing any previous one
+ * (SRS-ABR-007).
+ *
+ * The stand-down frame goes out BEFORE the close. Without it the displaced
+ * page's reconnect backoff fires, it displaces this one in turn, and the two
+ * trade the connection indefinitely while each call lands in whichever page
+ * happens to hold it — which is how writes reached the wrong document.
+ */
+function adoptPage(client) {
+  const previous = page;
+  page = client;
+  log(`hello from ${client.meta.title || 'a plan'} (${client.id})`);
+
+  if (!previous || previous === client) {
+    pushAgents();
+    return;
+  }
+
+  log('a second page connected; displacing the previous one');
+  try {
+    previous.socket.write(
+      encodeFrame(
+        JSON.stringify({
+          type: 'displaced',
+          reason: 'Another plan connected to the agent bridge.',
+        }),
+      ),
+    );
+  } catch (err) {
+    log('could not notify the displaced page:', err?.message ?? String(err));
+  }
+  previous.socket.end();
+  releaseLock('page displaced');
+  rejectPending(
+    'The plan this call was sent to was displaced by another connection. Retry.',
+  );
+  pushAgents();
+}
+
+/** Who is attached, as the page should show it (SRS-ABR-073). */
+function agentsFrame() {
+  const agents = [{ label: AGENT_LABEL, role: 'hub', connectedAt: STARTED_AT }];
+  for (const info of peers.values()) {
+    agents.push({ label: info.label, role: 'peer', connectedAt: info.connectedAt });
+  }
+  return { type: 'agents', agents };
+}
+
+function pushAgents() {
+  if (!page) return;
+  try {
+    page.socket.write(encodeFrame(JSON.stringify(agentsFrame())));
+  } catch (err) {
+    log('could not push the agents frame:', err?.message ?? String(err));
+  }
+}
+
+/** A peer's tool call, run here with the peer's identity holding the lease. */
+async function handlePeerRequest(client, message) {
+  const info = peers.get(client) ?? { agentId: 'unknown', label: 'unnamed' };
+  const reply = (body) => {
+    try {
+      client.socket.write(
+        encodeFrame(JSON.stringify({ type: 'peer-response', reqId: message.reqId, ...body })),
+      );
+    } catch (err) {
+      log('could not answer a peer:', err?.message ?? String(err));
+    }
+  };
+  try {
+    const result = await runTool(message.name, message.args, info.agentId, info.label);
+    reply({ ok: true, result });
+  } catch (err) {
+    reply({
+      ok: false,
+      error: {
+        code: err instanceof Locked ? 'LOCKED' : (err.bridgeCode ?? 'VALIDATION_FAILED'),
+        message: err.message,
+      },
+    });
+  }
+}
+
+/**
+ * The page a call targets (SRS-ABR-004/007).
+ *
+ * The message names the route that connects one. The old text said "switch the
+ * Agent toggle on", which named a header button that production builds did not
+ * have — an instruction an agent could not follow (SRS-ABR-066).
+ */
 function pickClient(requestedId) {
-  const list = [...clients];
-  if (list.length === 0) {
-    throw bridgeFailure('NO_CLIENT', 'No PowerRoadmap page is connected. Open the app and switch the Agent toggle on.');
-  }
-  if (requestedId) {
-    const found = list.find((c) => c.id === requestedId);
-    if (!found) throw bridgeFailure('UNKNOWN_ID', `No connected client with id '${requestedId}'.`);
-    return found;
-  }
-  if (list.length > 1) {
-    // Silently editing the wrong open document is unrecoverable from the
-    // user's point of view, so refuse to guess.
+  if (!page) {
     throw bridgeFailure(
-      'UNKNOWN_ID',
-      `${list.length} clients are connected (${list.map((c) => c.id).join(', ')}); pass clientId to choose one.`,
+      'NO_CLIENT',
+      'No PowerRoadmap plan is connected. Open your plan, then turn on ' +
+        'Settings \u2192 Agent bridge \u2192 "Let a local agent edit this plan".',
     );
   }
-  return list.sort((a, b) => b.lastSeen - a.lastSeen)[0];
+  if (requestedId && page.id !== requestedId) {
+    throw bridgeFailure(
+      'UNKNOWN_ID',
+      `The connected plan is '${page.id}', not '${requestedId}'. The newest page to ` +
+        'connect is the one the bridge drives; there is never more than one.',
+    );
+  }
+  return page;
 }
 
 function bridgeFailure(code, message) {
@@ -450,41 +763,92 @@ function writeTokenFile() {
   }
 }
 
+/** What this process knows about the bridge without asking the page. */
+function bridgeFacts() {
+  return {
+    bridge: {
+      me: AGENT_LABEL,
+      role: mode,
+      port: PORT,
+      agents: agentsFrame().agents,
+      lease: lockStatus(),
+    },
+  };
+}
+
+/**
+ * Run a tool on this process, holding `agentId`'s lease while it runs.
+ *
+ * Called directly for this process's own agent, and through `handlePeerRequest`
+ * for every other MCP process, so both travel one path and one lease
+ * (SRS-ABR-070/071).
+ *
+ * Returns the payload an agent should see, or throws `Locked` / a bridge
+ * failure.
+ */
+async function runTool(name, args, agentId, label) {
+  const { clientId, opId: callerOpId, ...params } = args ?? {};
+
+  // `get_status` is the one tool that must answer whatever is happening: with
+  // no plan attached, and while someone else holds the lease (SRS-ABR-072).
+  if (name === 'get_status' && !page) {
+    return { ...bridgeFacts(), connected: false };
+  }
+
+  const readOnly = READ_ONLY.has(name);
+  const release = readOnly ? null : acquireLock(agentId, label);
+  try {
+    // Mutating calls always carry an idempotency key so a timeout is recoverable.
+    const opId = MUTATING.has(name)
+      ? (callerOpId ?? `op-${randomBytes(8).toString('hex')}`)
+      : undefined;
+
+    const response = await callClient(name, params, opId, clientId);
+    if (!response.ok) {
+      throw bridgeFailure(
+        response.error?.code ?? 'VALIDATION_FAILED',
+        response.error?.message ?? 'unknown error',
+      );
+    }
+    return {
+      ...(typeof response.data === 'object' && response.data !== null
+        ? response.data
+        : { result: response.data }),
+      ...(name === 'get_status' ? bridgeFacts() : {}),
+      revision: response.revision,
+      userEditedSince: response.userEditedSince,
+      ...(response.replayed ? { replayed: true } : {}),
+      ...(opId ? { opId } : {}),
+    };
+  } finally {
+    if (release) release();
+  }
+}
+
 async function handleToolCall(id, name, args) {
   ensureTokenFileOwned();
+  if (startupError) {
+    mcpToolText(id, { error: 'NO_CLIENT', message: startupError }, true);
+    return;
+  }
   const known = TOOLS.some((t) => t.name === name);
   if (!known) {
     mcpToolText(id, `Unknown tool: ${name}`, true);
     return;
   }
 
-  const { clientId, opId: callerOpId, ...params } = args ?? {};
-  // Mutating calls always carry an idempotency key so a timeout is recoverable.
-  const opId = MUTATING.has(name) ? (callerOpId ?? `op-${randomBytes(8).toString('hex')}`) : undefined;
-
   try {
-    const response = await callClient(name, params, opId, clientId);
-    if (!response.ok) {
-      mcpToolText(
-        id,
-        {
-          error: response.error?.code ?? 'VALIDATION_FAILED',
-          message: response.error?.message ?? 'unknown error',
-          revision: response.revision,
-        },
-        true,
-      );
-      return;
-    }
-    mcpToolText(id, {
-      ...(typeof response.data === 'object' && response.data !== null ? response.data : { result: response.data }),
-      revision: response.revision,
-      userEditedSince: response.userEditedSince,
-      ...(response.replayed ? { replayed: true } : {}),
-      ...(opId ? { opId } : {}),
-    });
+    const payload = mode === 'peer' ? await askHub(name, args) : await runTool(name, args, AGENT_ID, AGENT_LABEL);
+    mcpToolText(id, payload);
   } catch (err) {
-    mcpToolText(id, { error: err.bridgeCode ?? 'VALIDATION_FAILED', message: err.message }, true);
+    mcpToolText(
+      id,
+      {
+        error: err instanceof Locked ? 'LOCKED' : (err.bridgeCode ?? 'VALIDATION_FAILED'),
+        message: err.message,
+      },
+      true,
+    );
   }
 }
 
@@ -534,6 +898,143 @@ process.stdin.on('data', (chunk) => {
 });
 
 /* ------------------------------------------------------------------ */
+/* Peer mode: forward everything to the hub                            */
+/* ------------------------------------------------------------------ */
+
+/** @type {import('node:net').Socket | null} */
+let hubSocket = null;
+let nextPeerReq = 1;
+/** @type {Map<number, {resolve: Function, reject: Function, timer: NodeJS.Timeout}>} */
+const peerPending = new Map();
+
+function rejectPeerPending(message) {
+  for (const [reqId, entry] of peerPending) {
+    clearTimeout(entry.timer);
+    peerPending.delete(reqId);
+    entry.reject(bridgeFailure('NO_CLIENT', message));
+  }
+}
+
+/**
+ * Open a WebSocket to the hub by hand.
+ *
+ * There is no `ws` dependency in this project and the frame codec next door
+ * already does both directions, so the client handshake is 20 lines here rather
+ * than a package. Client frames must be masked (RFC 6455 §5.1), which is
+ * what `encodeFrame`'s `mask` option is for.
+ */
+function connectToHub() {
+  const key = randomBytes(16).toString('base64');
+  const expected = createHash('sha1').update(key + WS_GUID).digest('base64');
+  const socket = connect(PORT, '127.0.0.1', () => {
+    socket.write(
+      `GET /agent HTTP/1.1\r\n` +
+        `Host: 127.0.0.1:${PORT}\r\n` +
+        'Upgrade: websocket\r\n' +
+        'Connection: Upgrade\r\n' +
+        `Sec-WebSocket-Key: ${key}\r\n` +
+        'Sec-WebSocket-Version: 13\r\n\r\n',
+    );
+  });
+
+  let upgraded = false;
+  let buffer = Buffer.alloc(0);
+  const reader = new FrameReader();
+
+  socket.on('data', (chunk) => {
+    if (!upgraded) {
+      buffer = Buffer.concat([buffer, chunk]);
+      const headerEnd = buffer.indexOf('\r\n\r\n');
+      if (headerEnd === -1) return;
+      const head = buffer.subarray(0, headerEnd).toString('latin1');
+      if (!head.includes('101') || !head.includes(expected)) {
+        log('hub refused the peer handshake; retrying as a candidate hub');
+        socket.destroy();
+        return;
+      }
+      upgraded = true;
+      hubSocket = socket;
+      mode = 'peer';
+      startupError = null;
+      send({ type: 'peer-hello', agentId: AGENT_ID, label: AGENT_LABEL });
+      log(`peer: joined the hub on 127.0.0.1:${PORT} as "${AGENT_LABEL}"`);
+      chunk = buffer.subarray(headerEnd + 4);
+      buffer = Buffer.alloc(0);
+      if (chunk.length === 0) return;
+    }
+
+    for (const action of reader.push(chunk)) {
+      if (action.type === 'close') {
+        socket.end();
+        return;
+      }
+      if (action.type === 'pong') {
+        socket.write(encodeFrame(action.payload, OPCODE.pong, { mask: true }));
+        continue;
+      }
+      let message;
+      try {
+        message = JSON.parse(action.text);
+      } catch {
+        continue;
+      }
+      if (message.type !== 'peer-response') continue;
+      const entry = peerPending.get(message.reqId);
+      if (!entry) continue;
+      clearTimeout(entry.timer);
+      peerPending.delete(message.reqId);
+      entry.resolve(message);
+    }
+  });
+
+  function send(payload) {
+    socket.write(encodeFrame(JSON.stringify(payload), OPCODE.text, { mask: true }));
+  }
+  socket.sendJson = send;
+
+  const gone = () => {
+    if (hubSocket !== socket) return;
+    hubSocket = null;
+    rejectPeerPending('The agent hub went away. Retrying.');
+    // The hub's process exited, so the port is free again. Whoever gets there
+    // first becomes the new hub and everyone else re-joins it; the jitter stops
+    // every peer racing on the same tick.
+    setTimeout(() => void start(), 250 + Math.floor(Math.random() * 500));
+  };
+  socket.on('close', gone);
+  socket.on('error', gone);
+}
+
+/** Forward a tool call to the hub and wait for its answer. */
+function askHub(name, args) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    if (!hubSocket) {
+      rejectPromise(bridgeFailure('NO_CLIENT', 'Not joined to the agent hub yet. Retry in a moment.'));
+      return;
+    }
+    const reqId = nextPeerReq++;
+    // The hub applies its own per-call budget; this one only has to outlast it.
+    const timer = setTimeout(() => {
+      peerPending.delete(reqId);
+      rejectPromise(bridgeFailure('TIMEOUT', `The agent hub did not answer "${name}" in time.`));
+    }, CALL_TIMEOUT_MS * 3);
+    peerPending.set(reqId, {
+      resolve: (message) => {
+        if (message.ok) resolvePromise(message.result);
+        else {
+          const err = new Error(message.error?.message ?? 'unknown error');
+          err.bridgeCode = message.error?.code ?? 'VALIDATION_FAILED';
+          rejectPromise(err);
+        }
+      },
+      reject: rejectPromise,
+      timer,
+    });
+    hubSocket.sendJson({ type: 'peer-request', reqId, name, args });
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* Lifecycle                                                           */
 /* ------------------------------------------------------------------ */
 
@@ -546,28 +1047,45 @@ function cleanup() {
 }
 
 /**
- * Say why, and stop.
+ * Own the port, or join whoever already does (SRS-ABR-070).
  *
- * Without this an EADDRINUSE is an unhandled 'error' event: the process dies on
- * a stack trace, and anything waiting on `initialize` simply never hears back.
- * A caller cannot tell that from a bridge that is merely slow, which is how a
- * port collision between two test workers was read as a failure of the feature
- * the test happened to be asserting.
+ * EADDRINUSE used to kill the process, which meant the second agent of a
+ * session simply had no bridge: one MCP server is spawned per agent, so two
+ * agents always race for a fixed port. Dying also lost the MCP transport, so
+ * anything waiting on `initialize` never heard back and could not tell that
+ * from a bridge that was merely slow.
  */
-httpServer.on('error', (err) => {
-  const why =
-    err.code === 'EADDRINUSE'
-      ? `port ${PORT} is already in use — another bridge is running, or two of them started at once`
-      : err.message;
-  process.stderr.write(`[powerplanner-bridge] cannot listen: ${why}\n`);
-  process.exit(1);
-});
+function start() {
+  return new Promise((resolveStart) => {
+    const onError = (err) => {
+      httpServer.removeListener('error', onError);
+      if (err.code === 'EADDRINUSE') {
+        log(`port ${PORT} is held by another bridge; joining it as a peer`);
+        connectToHub();
+        resolveStart();
+        return;
+      }
+      startupError =
+        `Could not start the agent bridge on 127.0.0.1:${PORT}: ${err.message}. ` +
+        'Set POWERPLANNER_BRIDGE_PORT to a free port.';
+      log(`cannot listen: ${startupError}`);
+      resolveStart();
+    };
+    httpServer.once('error', onError);
 
-// Loopback only, never a wildcard address (SRS-ABR-002).
-httpServer.listen(PORT, '127.0.0.1', () => {
-  writeTokenFile();
-  process.stderr.write(`[powerplanner-bridge] listening on 127.0.0.1:${PORT}\n`);
-});
+    // Loopback only, never a wildcard address (SRS-ABR-002).
+    httpServer.listen(PORT, '127.0.0.1', () => {
+      httpServer.removeListener('error', onError);
+      mode = 'hub';
+      startupError = null;
+      writeTokenFile();
+      log(`hub: listening on 127.0.0.1:${PORT} as "${AGENT_LABEL}"`);
+      resolveStart();
+    });
+  });
+}
+
+void start();
 
 process.on('exit', cleanup);
 process.on('SIGINT', () => {
