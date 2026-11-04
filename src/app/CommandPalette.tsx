@@ -20,6 +20,7 @@ import { TEMPLATES } from '../utils/templates';
 import { todayISO, addDays } from '../utils/dates';
 import { newId } from '../utils/ids';
 import type { TimeScale, ThemeName } from '../types/document';
+import { ROW_SEPARATOR_CHOICES } from './lookChoices';
 import {
   Plus,
   Diamond,
@@ -56,7 +57,7 @@ import type { LucideIcon } from 'lucide-react';
 interface Command {
   id: string;
   label: string;
-  group: 'Create' | 'Tools' | 'Scale' | 'View' | 'Theme' | 'Settings' | 'File' | 'Templates' | 'Edit' | 'Help';
+  group: 'Create' | 'Tools' | 'Scale' | 'View' | 'Theme' | 'Chart look' | 'Settings' | 'File' | 'Templates' | 'Edit' | 'Help';
   icon?: LucideIcon;
   shortcut?: string;
   keywords?: string;
@@ -400,6 +401,24 @@ function useCommands(close: () => void): Command[] {
   cmds.push({ id: 'theme-light', label: 'Theme: Light', group: 'Theme', icon: Sun, run: run(() => setTheme('light')) });
   cmds.push({ id: 'theme-print', label: 'Theme: Print (high-contrast)', group: 'Theme', icon: Printer, run: run(() => setTheme('print')) });
 
+  // ROW SEPARATOR
+  //
+  // Set from here directly, the way the themes above are, rather than only
+  // opening the dialog at the right section. The word a planner types is
+  // "separator", and before this the palette had no entry carrying it — the
+  // search that should have rescued a setting he could not find returned
+  // nothing at all.
+  for (const c of ROW_SEPARATOR_CHOICES) {
+    cmds.push({
+      id: `rowsep-${c.value}`,
+      label: `Row separator: ${c.label}`,
+      group: 'Chart look',
+      icon: Rows3,
+      keywords: 'separator rule divider line between rows horizontal dashed dotted',
+      run: run(() => useDocumentStore.getState().setRowSeparator({ rowSeparator: c.value })),
+    });
+  }
+
   // SETTINGS
   //
   // The panel is now where every preference lives, and the gear was the only
@@ -410,7 +429,7 @@ function useCommands(close: () => void): Command[] {
     label: 'Settings…',
     group: 'Settings',
     icon: SettingsIcon,
-    keywords: 'preferences options theme weekends working days bridge agent mcp update version about file saving',
+    keywords: 'preferences options theme weekends working days row separator rule divider bridge agent mcp update version about file saving',
     run: run(() => useViewStore.getState().setSettingsOpen(true)),
   });
   cmds.push({

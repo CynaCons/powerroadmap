@@ -14,6 +14,13 @@ import { SelectionGroup } from './SelectionGroup';
 import { todayISO, addDays } from '../utils/dates';
 import type { TimeScale, ThemeName } from '../types/document';
 import { gridDelimiterOf, weekendDisplayOf, type GridDelimiter, type WeekendDisplay } from '../types/document';
+import { rowSeparatorOf, rowSeparatorWidthOf, rowSeparatorScopeOf } from '../types/document';
+import {
+  ROW_SEPARATOR_CHOICES,
+  ROW_SEPARATOR_WIDTH_CHOICES,
+  ROW_SEPARATOR_SCOPE_CHOICES,
+  panelLabel,
+} from './lookChoices';
 import type { DocOp } from '../stores/docOps';
 import { usePanelStore, type SectionId } from '../stores/panelStore';
 
@@ -292,6 +299,9 @@ function DocumentGroup() {
   const applyBatch = useDocumentStore((s) => s.applyBatch);
   const gridDelimiter = gridDelimiterOf(calendar);
   const weekendDisplay = weekendDisplayOf(calendar);
+  const style = useDocumentStore((s) => s.doc.style);
+  const setRowSeparator = useDocumentStore((s) => s.setRowSeparator);
+  const separator = rowSeparatorOf(style);
 
   /**
    * Written as operations, which is what an agent sends too (SRS-ABR-025).
@@ -367,6 +377,77 @@ function DocumentGroup() {
           </button>
         ))}
       </div>
+      {/*
+        The rule between rows (SRS-LAY-061). It shipped in v2.37.0 into the
+        Settings dialog alone, and the owner went looking for it here, beside
+        the four look settings he already knew: "where can I set it? I don't
+        see where I can." A setting is where its neighbours are.
+
+        Width and scope appear only once there is a line to apply them to, as
+        in the dialog — in a 240px column two dead rows cost more than they do
+        in a dialog, not less.
+      */}
+      <span className="cmdbar__field-label">Row separator</span>
+      <div className="cmdbar__scale" role="radiogroup" aria-label="Row separator">
+        {ROW_SEPARATOR_CHOICES.map((c) => (
+          <button
+            key={c.value}
+            role="radio"
+            aria-checked={separator === c.value}
+            className={separator === c.value ? 'is-active' : ''}
+            title={c.hint}
+            data-testid={`cmdbar-rowsep-${c.value}`}
+            onClick={() => setRowSeparator({ rowSeparator: c.value })}
+          >
+            {panelLabel(c)}
+          </button>
+        ))}
+      </div>
+      {separator !== 'none' && (
+        <>
+          {/*
+            Each strip gets its own label here, where the dialog leaves the two
+            sub-controls bare. The panel is a wrapping flex flow, not the
+            dialog's label/control grid: an unlabelled strip starts mid-line
+            against the previous control, and the NEXT field's label then lands
+            beside it — "Sections | Every row | Weekends" reads as three scope
+            options, one of which is a heading. A label per strip is what every
+            other control in this column already does.
+          */}
+          <span className="cmdbar__field-label">Thickness</span>
+          <div className="cmdbar__scale" role="radiogroup" aria-label="Row separator width">
+            {ROW_SEPARATOR_WIDTH_CHOICES.map((c) => (
+              <button
+                key={c.value}
+                role="radio"
+                aria-checked={rowSeparatorWidthOf(style) === c.value}
+                className={rowSeparatorWidthOf(style) === c.value ? 'is-active' : ''}
+                title={c.hint}
+                data-testid={`cmdbar-rowsep-width-${c.value}`}
+                onClick={() => setRowSeparator({ rowSeparatorWidth: c.value })}
+              >
+                {panelLabel(c)}
+              </button>
+            ))}
+          </div>
+          <span className="cmdbar__field-label">Draw between</span>
+          <div className="cmdbar__scale" role="radiogroup" aria-label="Where the row separator is drawn">
+            {ROW_SEPARATOR_SCOPE_CHOICES.map((c) => (
+              <button
+                key={c.value}
+                role="radio"
+                aria-checked={rowSeparatorScopeOf(style) === c.value}
+                className={rowSeparatorScopeOf(style) === c.value ? 'is-active' : ''}
+                title={c.hint}
+                data-testid={`cmdbar-rowsep-scope-${c.value}`}
+                onClick={() => setRowSeparator({ rowSeparatorScope: c.value })}
+              >
+                {panelLabel(c)}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       <span className="cmdbar__field-label">Weekends</span>
       <div className="cmdbar__scale" role="radiogroup" aria-label="Weekend display">
         {WEEKEND_CHOICES.map((c) => (

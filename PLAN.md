@@ -1191,6 +1191,16 @@ Four questions the prototypes must put in front of the owner, because they are v
 - [x] A marker says what it is doing while it is dragged [agent: claude]
 - [x] Hovering a marker lights its rule and its chip together [agent: claude]
 
+### v2.37.1 — Settings a planner can find (COMPLETE)
+**Goal:** The row separator is where a planner looks for it.
+- [x] Put the row separator in the side panel beside its neighbours [agent: claude]
+- [x] Share one option list between the panel and the dialog [agent: claude]
+- [x] Shorten the scope labels so they fit the panel column [agent: claude]
+- [x] Let the command palette find the separator by name [agent: claude]
+- [x] Add a parity test holding both surfaces to one list [agent: claude]
+- [x] Replace the typecheck that was checking no files [agent: claude]
+- [x] Release v2.37.1 and verify the published bytes [agent: claude]
+
 # Backlog (High-level, unscheduled — product & long-horizon only)
 - Cloud / sharing edition
 - Excel/CSV linking, resource swimlanes, baselines, AI assist, collaboration

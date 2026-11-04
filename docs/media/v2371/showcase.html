@@ -1,0 +1,147 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PowerRoadmap v2.37.1</title>
+<style>
+  :root {
+    --bg: #fbfbfa; --fg: #1d2127; --soft: #5b6270; --dim: #8a909c;
+    --rule: #e2e2dc; --panel: #ffffff; --accent: #1f4e79; --code-bg: #f2f2ee;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15181c; --fg: #e6eaf2; --soft: #a8b0bd; --dim: #79818f;
+      --rule: #272b32; --panel: #1b1f25; --accent: #7e9bc9; --code-bg: #1f242b;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15181c; --fg: #e6eaf2; --soft: #a8b0bd; --dim: #79818f;
+    --rule: #272b32; --panel: #1b1f25; --accent: #7e9bc9; --code-bg: #1f242b;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap {
+    max-width: 920px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 48px 72px;
+  }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; text-wrap: balance; letter-spacing: -0.01em; }
+  .sub { color: var(--soft); margin: 0 0 40px; font-size: 16px; }
+  h2 {
+    font-size: 19px; margin: 44px 0 10px; text-wrap: balance;
+    padding-top: 20px; border-top: 1px solid var(--rule);
+  }
+  h3 { font-size: 15px; margin: 24px 0 6px; color: var(--fg); }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  .soft { color: var(--soft); }
+  figure { margin: 20px 0 8px; }
+  img { max-width: 100%; display: block; border: 1px solid var(--rule); border-radius: 8px; }
+  figcaption { color: var(--dim); font-size: 13px; margin-top: 8px; max-width: 68ch; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 14px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+  td:first-child { white-space: nowrap; color: var(--soft); }
+  .srs { color: var(--dim); font-size: 12.5px; letter-spacing: 0.4px; margin-top: 10px; }
+  blockquote {
+    margin: 0 0 16px; padding: 10px 16px; border-left: 3px solid var(--accent);
+    background: var(--panel); color: var(--soft); border-radius: 0 6px 6px 0;
+  }
+  .grid { display: flex; flex-wrap: wrap; gap: 16px; }
+  .grid > figure { flex: 1 1 380px; min-width: 0; margin: 0; }
+</style>
+
+<div class="wrap">
+  <h1>A setting you can find</h1>
+  <p class="sub">PowerRoadmap v2.37.1 &mdash; the row separator shipped a day ago and the owner could not find it. 4 November 2026.</p>
+
+  <blockquote>"Did you add it? Like a separator? If so, where can I set it? I don't see where I can."</blockquote>
+
+  <p>It had shipped, and it worked. It was in Settings &rarr; Chart look, behind the gear in the header. Nine tests covered it drawing correctly; none covered it being <em>found</em>, so the suite was green and the feature was, to the only person who matters, missing.</p>
+
+  <h2>Where he looked, and why he was right to</h2>
+
+  <p>The side panel has a <strong>Document</strong> section, and it already held four chart-look settings: theme, whether bars share a line, grid delimiters, weekends. The row separator was the fifth of its kind and the only one that was not there. Looking at the place where the look settings live and finding no fifth is not a user error &mdash; it is the correct inference from what the panel showed.</p>
+
+  <p>An audit of both surfaces found those three controls &mdash; style, width, scope &mdash; were the <em>only</em> settings reachable from one surface and not the other. Nothing else had drifted. Which is the clue to the cause.</p>
+
+  <h3>The cause was structural</h3>
+
+  <p>Each surface kept its own hand-written option lists. Two <code>THEMES</code> constants, one keyed <code>id</code> and one <code>value</code>. <code>DELIMITERS</code> here and <code>DELIMITER_CHOICES</code> there, one saying "Quarter" and the other "Qtr". Six of the seven settings were duplicated this way; only one, <code>OVERLAP</code>, was shared. Nothing connected the two files, so adding a setting to one could not fail in the other. It could only be forgotten.</p>
+
+  <p>So the options now live in one module, <code>app/lookChoices.ts</code>, and both surfaces read it. Labels may still differ &mdash; the panel is a 288px column and says "Sections" where the dialog has room for "Between sections" &mdash; but that is a typographic choice, declared as a <code>short</code> field on the one option, not two lists drifting apart.</p>
+
+  <figure>
+    <img src="panel-closeup.png" alt="The side panel's Document section. Row separator offers None, Line, Dashed, Dotted with Dashed selected; Thickness offers 1px to 4px with 2px selected; Draw between offers Sections and Every row.">
+    <figcaption>The panel now, with the separator between Delimiters and Weekends where its neighbours are. Thickness and Draw between appear only once there is a line to apply them to.</figcaption>
+  </figure>
+
+  <p>Both sub-controls got their own label here, where the dialog leaves them bare. The panel is a wrapping flex column, not the dialog's label/control grid: an unlabelled strip starts mid-line against the control above it, and the <em>next</em> field's label then lands beside it &mdash; "Sections | Every row | Weekends" reads as three scope options, one of which is a heading.</p>
+
+  <figure>
+    <img src="panel-separator.png" alt="The full app with dashed 2px rules drawn above each section heading in the chart.">
+    <figcaption>Set from the panel, drawn in the chart: six dashed rules at 2px, above each section heading.</figcaption>
+  </figure>
+
+  <h2>And the search that should have rescued him</h2>
+
+  <p>The command palette carried no entry containing the word "separator" anywhere &mdash; not in a label, not in a keyword. A planner who could not find the setting and typed the word for it got nothing back. There are four entries now, which set the style directly the way the theme commands do, rather than only opening the dialog at the right section.</p>
+
+  <figure>
+    <img src="palette-separator.png" alt="The command palette with the word separator typed, showing a Chart look group with Row separator: None, Line, Dashed and Dotted, and a Settings entry.">
+    <figcaption>Typing the word a planner would actually type.</figcaption>
+  </figure>
+
+  <figure>
+    <img src="dialog-separator.png" alt="The Settings dialog, Chart look section, showing Row separator with its three rows of options.">
+    <figcaption>The dialog is unchanged. It was never the problem; being the only way in was.</figcaption>
+  </figure>
+
+  <p class="srs">SRS-SET-015 &middot; SRS-LAY-061</p>
+
+  <h2>The test that was missing</h2>
+
+  <p>The suite proved the separator worked and never asked whether anyone could reach it. There are now two tests that do, and the contract they hold both surfaces to is a list of five <code>aria-label</code>s in <code>lookChoices.ts</code> &mdash; the same spelling on both surfaces, so a screen reader also hears one setting named one way wherever it is met.</p>
+
+  <p>The source-level one runs in milliseconds on every unit pass. Rather than trust it, it was broken on purpose first: renaming the panel's group to "Row rule" fails it with <em>"the side panel has no control labelled Row separator"</em>, which is the sentence that would have stopped this release a day earlier.</p>
+
+  <h2>And a gate that was checking nothing at all</h2>
+
+  <p>This is the part worth keeping. Partway through, the dev server went white and Playwright timed out on every spec, including ones that had passed an hour before. The cause was a duplicate <code>Rows3</code> in an import list &mdash; mine, added without looking. Babel rejects it outright.</p>
+
+  <p><strong><code>npx tsc --noEmit</code> had reported clean.</strong> So had <code>eslint</code>. A deliberate <code>const __probe: number = "not a number"</code> appended to the same file also passed.</p>
+
+  <p>The root <code>tsconfig.json</code> is a solution-style config: <code>"files": []</code> with project references. Bare <code>tsc --noEmit</code> against it checks <em>zero files</em> and exits 0. The real check is <code>tsc -b</code>, which follows the references, and it lives inside <code>npm run build</code> where nothing calls it by name. Run properly, it caught three real errors in this change immediately, including an invalid palette group in my own new code.</p>
+
+  <p>Every release note here saying "tsc clean" was reporting a command that checked nothing. There is a <code>typecheck</code> script now, it is <code>tsc -b</code>, and it was negative-controlled against the duplicate import: <code>error TS2300: Duplicate identifier 'Rows3'</code>.</p>
+
+  <h2>Verification</h2>
+
+  <table>
+    <tr><th>Check</th><th>Result</th></tr>
+    <tr><td>Typecheck</td><td><code>npm run typecheck</code> (<code>tsc -b</code>) &mdash; clean. The previous <code>tsc --noEmit</code> checked 0 files and is retired.</td></tr>
+    <tr><td>Lint</td><td><code>eslint</code> &mdash; 0 errors</td></tr>
+    <tr><td>Unit</td><td>580 tests across 73 files, 0 failed &mdash; 6 new in <code>lookParity.test.ts</code></td></tr>
+    <tr><td>e2e</td><td>34 passed, 1 skipped, 0 failed across the 5 specs this change can reach, desktop project</td></tr>
+    <tr><td>Parity spec</td><td>5 passed: panel, dialog, panel&rarr;chart, panel&rarr;dialog, palette</td></tr>
+    <tr><td>Negative control</td><td>Renaming the panel's group fails the unit guard with the right sentence; restoring it passes</td></tr>
+    <tr><td>Gate control</td><td><code>tsc -b</code> fails on the duplicate import that <code>tsc --noEmit</code> passed</td></tr>
+    <tr><td>Live</td><td>Panel exposes all 5 look controls; dashed 2px drew 6 rules; palette returns 5 commands for "separator"; fresh tab, no console errors</td></tr>
+    <tr><td>Build</td><td><code>dist-template/index.html</code> 474,287 bytes (gzip 140.41 kB), up 1,683 from v2.37.0</td></tr>
+    <tr><td>Not run</td><td>The tablet and mobile projects, and the 30-odd specs this change cannot reach</td></tr>
+  </table>
+
+  <h2>What went red on the way</h2>
+
+  <p><strong>Every e2e spec, including ones that had just passed.</strong> Not a flake and not the WebKit leak: the app would not compile, because of the duplicate import above. Running a known-good spec was what separated "my new test is wrong" from "the server is serving a broken app" &mdash; it failed identically, which pointed away from the test and at the environment.</p>
+
+  <p><strong>Three errors from the first real typecheck.</strong> An invalid <code>group: 'Chart look'</code> against a closed union in the palette, and two in the new unit test where a generic signature made a mixed array uninferable. All three had been sitting under a green <code>tsc --noEmit</code>.</p>
+
+  <p><strong>The panel's first layout.</strong> The two sub-controls rendered unlabelled, so the width strip sat in the label gutter and the "Weekends" heading landed beside the scope buttons. Caught by looking at the panel, not by a test &mdash; nothing asserts that a column reads properly.</p>
+</div>

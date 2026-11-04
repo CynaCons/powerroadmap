@@ -14,12 +14,16 @@ import { gridDelimiterOf, weekendDisplayOf,
   rowSeparatorOf,
   rowSeparatorWidthOf,
   rowSeparatorScopeOf,
-  ROW_SEPARATOR_WIDTHS
 } from '../types/document';
-import type { GridDelimiter, ThemeName, WeekendDisplay, RowSeparator, RowSeparatorScope} from '../types/document';
+import type { GridDelimiter, ThemeName, WeekendDisplay } from '../types/document';
 import type { DocOp } from '../stores/docOps';
 import { useDialogFocus } from './useDialogFocus';
 import { OVERLAP } from './CommandBar';
+import {
+  ROW_SEPARATOR_CHOICES,
+  ROW_SEPARATOR_WIDTH_CHOICES,
+  ROW_SEPARATOR_SCOPE_CHOICES,
+} from './lookChoices';
 
 /**
  * Settings — one scrolling page of sections beside a side index (SRS-SET-001).
@@ -64,24 +68,10 @@ const WEEKENDS: { value: WeekendDisplay; label: string; hint: string }[] = [
   { value: 'shaded', label: 'Shaded', hint: 'Non-working days are shaded behind the bars' },
 ];
 
-const ROW_SEPARATOR_CHOICES: { value: RowSeparator; label: string; hint: string }[] = [
-  { value: 'none', label: 'None', hint: 'No rule between rows' },
-  { value: 'solid', label: 'Line', hint: 'An unbroken rule' },
-  { value: 'dashed', label: 'Dashed', hint: 'A broken rule' },
-  { value: 'dotted', label: 'Dotted', hint: 'A rule of dots' },
-];
-
-const ROW_SEPARATOR_WIDTH_CHOICES: { value: number; label: string; hint: string }[] =
-  ROW_SEPARATOR_WIDTHS.map((w) => ({
-    value: w,
-    label: `${w}px`,
-    hint: w === 1 ? 'A hairline' : `${w} pixels thick`,
-  }));
-
-const ROW_SEPARATOR_SCOPE_CHOICES: { value: RowSeparatorScope; label: string; hint: string }[] = [
-  { value: 'groups', label: 'Between sections', hint: 'A rule above each section heading only' },
-  { value: 'all', label: 'Between every row', hint: 'A rule between every row in the plan' },
-];
+/*
+ * The separator's options now live beside the panel's, in `lookChoices`, so a
+ * setting cannot reach one surface and miss the other the way this one did.
+ */
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
