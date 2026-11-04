@@ -26,12 +26,27 @@ interface Props {
  */
 function RowGutterInner({ rows, rowHeights, rowOffsets, width }: Props) {
   const updateRow = useDocumentStore((s) => s.updateRow);
+  const moveRow = useDocumentStore((s) => s.moveRow);
   const isSelected = useIsSelected();
   // Renaming belongs here, on the name itself, not in the bottom bar — the bar
   // is for quick actions (owner directive 2026-10-26).
   const [editing, setEditing] = useState<string | null>(null);
   const allRows = useDocumentStore((s) => s.doc.rows);
   const tasks = useDocumentStore((s) => s.doc.tasks);
+  /**
+   * Reordering by hand (SRS-EDIT-091).
+   *
+   * `move_row` already existed and already carried a section's children with
+   * it — the only thing missing was a way to reach it that is not a menu. The
+   * drop target is held in VISIBLE-row terms while dragging, because that is
+   * what the planner is looking at, and converted to the operation's own index
+   * on release.
+   *
+   * Pointer events rather than mouse events, so a finger reorders rows as well
+   * as a mouse does; the gutter sets `touch-action: none` or the browser
+   * claims the gesture as a pan before the first move is seen.
+   */
+  const [drag, setDrag] = useState<{ id: string; at: number | null } | null>(null);
 
   const { childCount, groupColor } = useMemo(() => {
     const counts = new Map<string, number>();
@@ -49,6 +64,54 @@ function RowGutterInner({ rows, rowHeights, rowOffsets, width }: Props) {
     }
     return { childCount: counts, groupColor: colors };
   }, [allRows, tasks]);
+
+  const beginDrag = (e: React.PointerEvent, id: string, i: number) => {
+    if (e.button !== 0 || editing === id) return;
+    // Screen y of this group's local origin, so the pointer can be read in the
+    // same coordinates the row offsets are written in — the gutter is inside a
+    // scrolled, translated group and no other mapping survives a scroll.
+    const box = (e.currentTarget as SVGGElement).getBoundingClientRect();
+    const originY = box.top - rowOffsets[i];
+    const startY = e.clientY;
+    let moved = false;
+    let at: number | null = null;
+
+    const boundary = (clientY: number): number => {
+      const localY = clientY - originY;
+      for (let k = 0; k < rows.length; k++) {
+        if (localY < rowOffsets[k] + rowHeights[k] / 2) return k;
+      }
+      return rows.length;
+    };
+
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.abs(ev.clientY - startY) < DRAG_THRESHOLD_PX) return;
+      moved = true;
+      at = boundary(ev.clientY);
+      setDrag({ id, at });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('keydown', key);
+      setDrag(null);
+      if (!moved || at === null) return;
+      // The operation indexes into the rows that REMAIN once the moving ones
+      // are lifted out, which is what `move_row` does with them. A section
+      // takes its children, so they leave the list too.
+      const to = dropIndex(allRows, rows, id, at);
+      if (to !== null) moveRow(id, to);
+    };
+    // Escape abandons the gesture and writes nothing, as everywhere else.
+    const key = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') return;
+      moved = false;
+      up();
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('keydown', key);
+  };
 
   // Each name cut to the gutter it has to fit in. Memoised on purpose: this
   // component re-renders on every scroll frame, and the fit is a binary search
@@ -87,9 +150,16 @@ function RowGutterInner({ rows, rowHeights, rowOffsets, width }: Props) {
             data-pp-selected={isSelected(row.id) ? '1' : undefined}
             transform={`translate(0 ${rowOffsets[i]})`}
             onDoubleClick={() => setEditing(row.id)}
-            // The row selects on a click and renames on a double-click, so the
-            // default arrow was telling the user there was nothing here.
-            style={{ cursor: 'pointer' }}
+            onPointerDown={(e) => beginDrag(e, row.id, i)}
+            // The row selects on a click, renames on a double-click and now
+            // reorders on a drag, so the default arrow was telling the user
+            // there was nothing here. `touch-action: none` or the browser pans
+            // the chart instead of handing us the gesture.
+            style={{
+              cursor: drag?.id === row.id ? 'grabbing' : 'pointer',
+              touchAction: 'none',
+              opacity: drag?.id === row.id ? 0.45 : 1,
+            }}
           >
             <rect
               x={0}
@@ -168,8 +238,65 @@ function RowGutterInner({ rows, rowHeights, rowOffsets, width }: Props) {
           </g>
         );
       })}
+
+      {/* Where it will land. Without this the planner is dragging a row that
+          went translucent and guessing at the rest (SRS-EDIT-091). */}
+      {drag?.at != null && (
+        <g pointerEvents="none" data-pp-rowdrop={drag.at}>
+          <line
+            x1={4}
+            x2={width - 4}
+            y1={drag.at < rows.length ? rowOffsets[drag.at] : rowOffsets[rows.length - 1] + rowHeights[rows.length - 1]}
+            y2={drag.at < rows.length ? rowOffsets[drag.at] : rowOffsets[rows.length - 1] + rowHeights[rows.length - 1]}
+            stroke="var(--color-accent)"
+            strokeWidth={2}
+          />
+          <circle
+            cx={6}
+            cy={drag.at < rows.length ? rowOffsets[drag.at] : rowOffsets[rows.length - 1] + rowHeights[rows.length - 1]}
+            r={3}
+            fill="var(--color-accent)"
+          />
+        </g>
+      )}
     </g>
   );
+}
+
+/** How far a press travels before it is a reorder and not a click. */
+const DRAG_THRESHOLD_PX = 4;
+
+/**
+ * Where a dropped row lands, in the index `move_row` speaks (SRS-EDIT-091).
+ *
+ * Pure, and exported, because this is the whole of the reorder worth being
+ * sure about and a jsdom pointer drag proves nothing about it. The operation
+ * removes the moving rows first and then inserts at `toIndex`, so the answer
+ * is an index into what REMAINS — not into the list the planner can see, and
+ * not into the full document either.
+ *
+ * `boundary` is a slot between visible rows: 0 is above the first, and
+ * `visible.length` is past the last. Returns null when the move is a no-op,
+ * which is a drop onto the moving row itself or onto one of its own children.
+ */
+export function dropIndex(
+  allRows: Row[],
+  visible: Row[],
+  movingId: string,
+  boundary: number,
+): number | null {
+  const movingIds = new Set<string>([
+    movingId,
+    ...allRows.filter((r) => r.groupId === movingId).map((r) => r.id),
+  ]);
+  const rest = allRows.filter((r) => !movingIds.has(r.id));
+  const before = boundary >= 0 && boundary < visible.length ? visible[boundary] : null;
+  // Dropping a section onto its own child would ask the operation to insert a
+  // run of rows inside the hole those same rows just left.
+  if (before && movingIds.has(before.id)) return null;
+  if (!before) return rest.length;
+  const to = rest.findIndex((r) => r.id === before.id);
+  return to < 0 ? rest.length : to;
 }
 
 /**

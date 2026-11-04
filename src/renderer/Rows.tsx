@@ -2,6 +2,7 @@ import { useMemo, memo } from 'react';
 import { useDocumentStore } from '../stores/documentStore';
 import { useSelectionStore } from '../stores/selectionStore';
 import type { Row } from '../types/document';
+import { rowSeparatorOf, rowSeparatorWidthOf, rowSeparatorScopeOf } from '../types/document';
 
 interface Props {
   rows: Row[];
@@ -12,18 +13,52 @@ interface Props {
 }
 
 /**
- * Row separators, drawn between GROUPS only.
+ * Row separators (SRS-LAY-061).
  *
  * A rule under every row turns a long plan into ruled paper and competes with
- * the bars for attention. The grouping is the structure worth drawing, so the
- * rule lands above each group header and nowhere else — the gutter's indent
- * and weight carry the rest (owner report 2026-10-23).
+ * the bars for attention, so the default stays what it was: one hairline above
+ * each group header, the gutter's indent and weight carrying the rest (owner
+ * report 2026-10-23).
+ *
+ * It is a default now rather than the only option. The owner asked on
+ * 2026-11-04 to configure it — a line whose width is theirs to choose, or a
+ * dashed or dotted one, and between every row if they want it. `solid` at
+ * width 1 over groups draws exactly what this component drew before, so a plan
+ * written without the setting is unchanged.
  */
 function RowsInner({ rows, rowHeights, rowOffsets, width }: Props) {
   const allRows = useDocumentStore((s) => s.doc.rows);
   const hasChildren = new Set(allRows.filter((r) => r.groupId).map((r) => r.groupId as string));
   const doc = useDocumentStore((s) => s.doc);
   const items = useSelectionStore((s) => s.items);
+
+  // The rule the planner asked for. Read through the helpers so a plan written
+  // before the setting existed draws what it always drew.
+  const separator = rowSeparatorOf(doc.style);
+  const sepWidth = rowSeparatorWidthOf(doc.style);
+  const scope = rowSeparatorScopeOf(doc.style);
+  /* The pattern scales with the width, or a 4px dashed rule is a solid one
+     with a rumour of a gap. A dot is drawn as a zero-length dash so a round
+     cap can make it round. */
+  const dash =
+    separator === 'dashed'
+      ? `${sepWidth * 3} ${sepWidth * 2}`
+      : separator === 'dotted'
+        ? `0 ${sepWidth * 2.5}`
+        : undefined;
+  /*
+   * A rule nobody asked for stays a whisper; a rule somebody chose is legible.
+   *
+   * The default ink measured 1.23:1 against the sheet, which is correct for the
+   * one hairline above a section heading and useless for a planner who opened
+   * Settings and picked "Dashed, 2px, between every row" — they would have got
+   * 38 lines they cannot see and reported the feature as broken.
+   */
+  const configured =
+    doc.style?.rowSeparator !== undefined ||
+    doc.style?.rowSeparatorWidth !== undefined ||
+    doc.style?.rowSeparatorScope !== undefined;
+  const ink = configured ? 'var(--color-row-rule)' : 'var(--color-border-soft)';
 
   /**
    * Which rows the band belongs to.
@@ -80,23 +115,30 @@ function RowsInner({ rows, rowHeights, rowOffsets, width }: Props) {
         ) : null,
       )}
 
-      {rows.map((row, i) => {
-        // A group header opens a band: rule above it, except at the very top
-        // where the axis baseline already closes the header off.
-        const isGroup = hasChildren.has(row.id);
-        if (!isGroup || i === 0) return null;
-        return (
-          <line
-            key={row.id}
-            x1={0}
-            y1={rowOffsets[i]}
-            x2={width}
-            y2={rowOffsets[i]}
-            stroke="var(--color-border-soft)"
-            strokeWidth={1}
-          />
-        );
-      })}
+      {separator !== 'none' &&
+        rows.map((row, i) => {
+          // A rule sits ABOVE a row, so the first one is never drawn: the axis
+          // baseline already closes the top of the sheet off.
+          if (i === 0) return null;
+          // A group header opens a band. Over `all`, every boundary gets one.
+          if (scope === 'groups' && !hasChildren.has(row.id)) return null;
+          return (
+            <line
+              key={row.id}
+              data-pp-rowsep={separator}
+              x1={0}
+              y1={rowOffsets[i]}
+              x2={width}
+              y2={rowOffsets[i]}
+              stroke={ink}
+              strokeWidth={sepWidth}
+              strokeDasharray={dash}
+              /* A dot is a round cap on a zero-length dash. Without this a
+                 "dotted" 1px rule is indistinguishable from a dashed one. */
+              strokeLinecap={separator === 'dotted' ? 'round' : undefined}
+            />
+          );
+        })}
     </g>
   );
 }

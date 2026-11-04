@@ -106,8 +106,32 @@ export function Markers({ doc, viewStart, pxPerDay, chartHeight, bodyHeight, scr
   const endEdit = useEditStore((s) => s.endEdit);
   const snapEnabled = useEditStore((s) => s.snapEnabled);
   const [drag, setDrag] = useState<MarkerDrag | null>(null);
+  /*
+   * One hover for the whole marker (owner report 2026-11-04: "when I mouse
+   * over it, stuff appears differently ... it's a bit unclear").
+   *
+   * A marker is drawn as two separate things far apart — a dashed rule up the
+   * plot and a chip at the foot — and each used to answer the pointer alone,
+   * with different cursors. So the planner met two objects and could not tell
+   * they were one. Both now set this, both read it, and both carry the same
+   * `ew-resize` cursor, because both do the one thing a marker does: move a
+   * date sideways.
+   */
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const enter = (id: string) => setHoverId(id);
+  const leave = (id: string) => setHoverId((cur) => (cur === id ? null : cur));
 
   const scale = doc.calendar.scale;
+  /*
+   * What the magnet is doing, said out loud (SR-IXC-04).
+   *
+   * `snapDelta` rounds to 7 days on every scale but `day`, so a drag moves in
+   * weeks and a drag shorter than half a week commits nothing at all. That is
+   * the right rule and it was completely invisible: the owner's report was
+   * "it's hard to move the marker ... maybe I can only drag it per week, I
+   * don't really know". Guessing correctly is not the same as being told.
+   */
+  const snapNote = snapEnabled && scale !== 'day' ? 'in steps of a week' : null;
   const bandTop = footBandTop(chartHeight, bodyHeight, scrollY);
   // The rules stop at the band wherever the band is, so the dashed line always
   // meets its own chip and never runs on past it.
@@ -191,7 +215,7 @@ export function Markers({ doc, viewStart, pxPerDay, chartHeight, bodyHeight, scr
               must not read a bar through it and a click on it must not select
               a row that is not on screen. Where the plan fits the window the
               band is still below the last row and covers nothing. */}
-          <rect x={0} y={bandTop} width={20000} height={BAND_H} fill="var(--color-bg-subtle)" />
+          <rect data-pp-markerband="1" x={0} y={bandTop} width={20000} height={BAND_H} fill="var(--color-bg-subtle)" />
           <line x1={0} y1={bandTop} x2={20000} y2={bandTop} stroke="var(--color-border-soft)" strokeWidth={1} />
           {/* The label the minimap never had: anything parked at the foot of
               the chart has to say what it is (SRS-ELEM-060). */}
@@ -217,6 +241,7 @@ export function Markers({ doc, viewStart, pxPerDay, chartHeight, bodyHeight, scr
         const x = anchoredX(shown, viewStart, pxPerDay, gridDelimiterOf(doc.calendar), m.anchor);
         const color = m.color || (m.type === 'deadline' ? 'var(--color-deadline)' : 'var(--color-text-soft)');
         const selected = isSelected(m.id);
+        const live = selected || !!dragging || hoverId === m.id;
         const w = chipWidth(m.label);
         const chipX = x - w / 2;
         const chipY = bandTop + (BAND_H - CHIP_H) / 2;
@@ -230,9 +255,9 @@ export function Markers({ doc, viewStart, pxPerDay, chartHeight, bodyHeight, scr
               x2={x}
               y2={ruleBottom}
               stroke={color}
-              strokeWidth={selected || dragging ? 2 : 1.2}
+              strokeWidth={live ? 2 : 1.2}
               strokeDasharray={m.type === 'deadline' ? '6 4' : '2 2'}
-              opacity={0.85}
+              opacity={live ? 1 : 0.85}
             />
             {/* The rule's own target. A 1.2px line is not something a pointer
                 can find, which is why nothing about a marker was reachable
@@ -240,13 +265,19 @@ export function Markers({ doc, viewStart, pxPerDay, chartHeight, bodyHeight, scr
             <rect
               data-pp-kind="marker"
               data-pp-selected={selected ? '1' : undefined}
+              data-pp-live={live ? '1' : undefined}
               data-pp-id={m.id}
-              x={x - 5}
+              /* 14, not 10. A marker is grabbed by this strip or not at all,
+                 and "it's hard to move the marker" was measured against a
+                 target half the 24px WCAG 2.2 asks for (SRS-EDIT-087). */
+              x={x - 7}
               y={0}
-              width={10}
+              width={14}
               height={ruleBottom}
               fill="transparent"
               style={{ cursor: 'ew-resize' }}
+              onMouseEnter={() => enter(m.id)}
+              onMouseLeave={() => leave(m.id)}
               onMouseDown={(e) => onMarkerDown(e, m.id, m.date)}
               onDoubleClick={(e) => { e.stopPropagation(); beginEdit(m.id); }}
             />
@@ -261,10 +292,14 @@ export function Markers({ doc, viewStart, pxPerDay, chartHeight, bodyHeight, scr
               width={w}
               height={CHIP_H}
               rx={4}
-              fill="var(--color-bg-panel)"
+              fill={live ? 'var(--color-bg-subtle)' : 'var(--color-bg-panel)'}
               stroke={color}
-              strokeWidth={1}
-              style={{ cursor: 'move' }}
+              strokeWidth={live ? 1.6 : 1}
+              /* The same cursor as the rule: one object, one gesture. `move`
+                 promised two axes and a marker has one. */
+              style={{ cursor: 'ew-resize' }}
+              onMouseEnter={() => enter(m.id)}
+              onMouseLeave={() => leave(m.id)}
               onMouseDown={(e) => onMarkerDown(e, m.id, m.date)}
               onDoubleClick={(e) => { e.stopPropagation(); beginEdit(m.id); }}
             />
@@ -318,11 +353,18 @@ export function Markers({ doc, viewStart, pxPerDay, chartHeight, bodyHeight, scr
                 clip, and a pill at the pointer would be cut off at exactly the
                 edges where a planner needs to read it. */}
             {dragging && (
-              <g pointerEvents="none">
-                <rect x={x - 46} y={chipY - 23} width={92} height={18} rx={9} fill="var(--color-accent)" />
+              <g pointerEvents="none" data-pp-marker-readout={m.id}>
+                <rect
+                  x={x - 58}
+                  y={scrollY + 4}
+                  width={116}
+                  height={snapNote ? 31 : 19}
+                  rx={9}
+                  fill="var(--color-accent)"
+                />
                 <text
                   x={x}
-                  y={chipY - 10}
+                  y={scrollY + 17}
                   textAnchor="middle"
                   fontSize={10}
                   fontWeight={600}
@@ -330,6 +372,19 @@ export function Markers({ doc, viewStart, pxPerDay, chartHeight, bodyHeight, scr
                 >
                   {formatForScale(shown, scale)}
                 </text>
+                {snapNote && (
+                  <text
+                    x={x}
+                    y={scrollY + 27}
+                    textAnchor="middle"
+                    fontSize={8}
+                    letterSpacing={0.4}
+                    fill="var(--color-bg-panel)"
+                    opacity={0.85}
+                  >
+                    {snapNote}
+                  </text>
+                )}
               </g>
             )}
           </g>

@@ -220,13 +220,23 @@ export function ChartArea() {
    *  the viewport edge when the plan is taller than the window. */
   const sheetBottom = Math.min(viewHeight, AXIS_TOTAL_H + layout.chartHeight + FOOT_BAND_H);
 
-  // The wheel scrolls the body. A plan that already fits has nothing to
-  // scroll, so maxScroll is 0 and the view stays put. The command bar floats
-  // over the foot of the chart, so the scroll range carries its height too —
-  // otherwise the last row can never be read. On paper the whole plan is on
-  // the sheet, so there is no scroll and no chrome to clear.
-  const CHROME_H = 52;
-  const bodyHeight = printing ? plotHeight : Math.max(0, size.height - AXIS_TOTAL_H - CHROME_H);
+  /*
+   * The wheel scrolls the body. A plan that already fits has nothing to
+   * scroll, so maxScroll is 0 and the view stays put. On paper the whole plan
+   * is on the sheet, so there is no scroll either.
+   *
+   * There used to be a `CHROME_H = 52` subtracted here, reserving room for a
+   * command bar that floated over the foot of the chart. It does not: `.cmdbar`
+   * is `grid-area: panel`, its own column beside the chart (its own row under
+   * it on a phone), and the status bar is the grid's own `--status-h` row. So
+   * this element's measured height IS the chart, nothing overlays its foot, and
+   * the 52 was buying nothing while costing two things — the marker band was
+   * pinned 52px above the bottom of the chart with a dead strip under it
+   * (owner report 2026-11-04: "it's floating about 50 pixels above the bottom
+   * ... there shouldn't be anything below"), and the plan could be scrolled 52px
+   * past its own end.
+   */
+  const bodyHeight = printing ? plotHeight : Math.max(0, size.height - AXIS_TOTAL_H);
   const maxScroll = Math.max(0, plotHeight - bodyHeight);
   /** What the plan is scrolled to. A page starts at the top of the plan,
    *  however far the window had been scrolled when Print was pressed. The

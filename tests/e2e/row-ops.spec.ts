@@ -39,9 +39,18 @@ test.describe('row operations are reachable by hand', () => {
   test('a row can be moved into another section', async ({ page }) => {
     await page.goto('/');
     const menu = await openRowMenu(page, 'MCAL integration');
+    // One entry now, with the sections behind it (SRS-EDIT-090). The menu used
+    // to carry one `Move into "X"` per section, so its height grew with the
+    // plan.
+    await expect(menu).not.toContainText('Move into');
+    const move = menu.getByRole('menuitem', { name: 'Move to section' });
+    await expect(move).toBeVisible();
+    await move.hover();
+    const sub = menu.locator('[data-pp-submenu="move-to"]');
+    await expect(sub).toBeVisible();
     // Its own section is not offered — that would be a no-op.
-    await expect(menu).not.toContainText('Move into “Platform');
-    await expect(menu).toContainText('Move into “Release”');
+    await expect(sub).not.toContainText('Platform');
+    await expect(sub).toContainText('Release');
   });
 
   test('working days are editable from the document context', async ({ page }) => {

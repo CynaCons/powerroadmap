@@ -105,6 +105,17 @@
   /* Weight of the not-yet-done part of a bar. */
   --bar-track-a: 0.32;
   --bar-edge-a: 0.55;
+  /* The frame around a bar with no fill (SRS-ELEM-075). Black is what the
+     owner asked for and what light and print get; on the dark sheet a black
+     frame is an invisible bar, so the token flips and an outline colour the
+     planner picks by hand still wins. */
+  --bar-ink: #000000;
+  /* A row rule the planner CHOSE (SRS-LAY-061). `--color-border-soft` is a
+     whisper by design — measured 1.23:1 against the sheet, which is right for
+     the quiet default above each section heading and wrong for a 2px dashed
+     rule somebody went into Settings to switch on. The default keeps the soft
+     ink; only a configured rule takes this one. */
+  --color-row-rule: #9A9A92;
 }
 
 [data-theme='light'] {
@@ -162,6 +173,8 @@
   --bar-stroke-a: 0.60;
   --bar-track-a: 0.32;
   --bar-edge-a: 0.55;
+  --bar-ink: #000000;
+  --color-row-rule: #9A9A92;
 }
 
 [data-theme='dark'] {
@@ -202,6 +215,8 @@
   --bar-stroke-a: 0.75;
   --bar-track-a: 0.40;
   --bar-edge-a: 0.62;
+  --bar-ink: #E6EAF2;
+  --color-row-rule: #767C88;
 }
 
 [data-theme='print'] {
@@ -232,6 +247,8 @@
   --bar-stroke-a: 0.85;
   --bar-track-a: 0.26;
   --bar-edge-a: 0.70;
+  --bar-ink: #000000;
+  --color-row-rule: #8A8A8A;
 }
 
 * { box-sizing: border-box; }

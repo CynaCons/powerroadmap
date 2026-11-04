@@ -10,8 +10,13 @@ import { checkForUpdate, performUpdate, type UpdateInfo } from '../utils/updateC
 import { formatForName, getBoundFormat, getCurrentHandle, saveAs } from '../persistence/fileIo';
 import { notify } from '../stores/noticeStore';
 import { DEFAULT_BRIDGE_URL } from '../agent/protocol';
-import { gridDelimiterOf, weekendDisplayOf } from '../types/document';
-import type { GridDelimiter, ThemeName, WeekendDisplay } from '../types/document';
+import { gridDelimiterOf, weekendDisplayOf,
+  rowSeparatorOf,
+  rowSeparatorWidthOf,
+  rowSeparatorScopeOf,
+  ROW_SEPARATOR_WIDTHS
+} from '../types/document';
+import type { GridDelimiter, ThemeName, WeekendDisplay, RowSeparator, RowSeparatorScope} from '../types/document';
 import type { DocOp } from '../stores/docOps';
 import { useDialogFocus } from './useDialogFocus';
 import { OVERLAP } from './CommandBar';
@@ -57,6 +62,25 @@ const DELIMITERS: { value: GridDelimiter; label: string; hint: string }[] = [
 const WEEKENDS: { value: WeekendDisplay; label: string; hint: string }[] = [
   { value: 'off', label: 'Off', hint: 'Non-working days look like any other day' },
   { value: 'shaded', label: 'Shaded', hint: 'Non-working days are shaded behind the bars' },
+];
+
+const ROW_SEPARATOR_CHOICES: { value: RowSeparator; label: string; hint: string }[] = [
+  { value: 'none', label: 'None', hint: 'No rule between rows' },
+  { value: 'solid', label: 'Line', hint: 'An unbroken rule' },
+  { value: 'dashed', label: 'Dashed', hint: 'A broken rule' },
+  { value: 'dotted', label: 'Dotted', hint: 'A rule of dots' },
+];
+
+const ROW_SEPARATOR_WIDTH_CHOICES: { value: number; label: string; hint: string }[] =
+  ROW_SEPARATOR_WIDTHS.map((w) => ({
+    value: w,
+    label: `${w}px`,
+    hint: w === 1 ? 'A hairline' : `${w} pixels thick`,
+  }));
+
+const ROW_SEPARATOR_SCOPE_CHOICES: { value: RowSeparatorScope; label: string; hint: string }[] = [
+  { value: 'groups', label: 'Between sections', hint: 'A rule above each section heading only' },
+  { value: 'all', label: 'Between every row', hint: 'A rule between every row in the plan' },
 ];
 
 const MONTHS = [
@@ -378,6 +402,9 @@ function LookSection() {
   const setAllowOverlap = useDocumentStore((s) => s.setAllowOverlap);
   const calendar = useDocumentStore((s) => s.doc.calendar);
   const applyBatch = useDocumentStore((s) => s.applyBatch);
+  const style = useDocumentStore((s) => s.doc.style);
+  const setRowSeparator = useDocumentStore((s) => s.setRowSeparator);
+  const separator = rowSeparatorOf(style);
 
   /**
    * Written as operations, which is what an agent sends too (SRS-ABR-025).
@@ -424,6 +451,42 @@ function LookSection() {
           ariaLabel="Grid delimiters"
           testId="settings-delimiter"
         />
+      </Row>
+
+      {/* The rule between rows (SRS-LAY-061). The width and the scope only
+          appear once there is a line to apply them to — two dead controls under
+          "None" is the kind of menu the owner asked to be rid of elsewhere. */}
+      <Row label="Row separator">
+        <div className="settings-panel__stack">
+          <Choice
+            name="settings-rowsep"
+            value={separator}
+            options={ROW_SEPARATOR_CHOICES}
+            onPick={(rowSeparator) => setRowSeparator({ rowSeparator })}
+            ariaLabel="Row separator"
+            testId="settings-rowsep"
+          />
+          {separator !== 'none' && (
+            <>
+              <Choice
+                name="settings-rowsep-width"
+                value={rowSeparatorWidthOf(style)}
+                options={ROW_SEPARATOR_WIDTH_CHOICES}
+                onPick={(rowSeparatorWidth) => setRowSeparator({ rowSeparatorWidth })}
+                ariaLabel="Row separator width"
+                testId="settings-rowsep-width"
+              />
+              <Choice
+                name="settings-rowsep-scope"
+                value={rowSeparatorScopeOf(style)}
+                options={ROW_SEPARATOR_SCOPE_CHOICES}
+                onPick={(rowSeparatorScope) => setRowSeparator({ rowSeparatorScope })}
+                ariaLabel="Where the row separator is drawn"
+                testId="settings-rowsep-scope"
+              />
+            </>
+          )}
+        </div>
       </Row>
 
       <Row label="Weekends">

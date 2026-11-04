@@ -11,6 +11,7 @@ import type { DragPreviewMap } from '../app/useChartInteractions';
 import { InlineLabel } from '../app/InlineLabel';
 import { computeCriticalPath } from '../layout/criticalPath';
 import { computeSpaceRight, fitLabel, type RequestedPlacement } from './labelFit';
+import { isNoFill, type BarOutline } from '../types/document';
 
 interface Props {
   layout: LayoutResult;
@@ -135,7 +136,23 @@ export function TaskBars({ layout, dragPreview }: Props) {
         const gripW = Math.min(GRIP_W, Math.floor(width - 8));
         const selected = isSelected(t.id);
         const critical = criticalIds.has(t.id);
-        const color = t.color || 'var(--bar-default)';
+        /*
+         * A bar with no fill at all (SRS-ELEM-075).
+         *
+         * `fill="none"` is already what SVG calls it, so the sentinel needs no
+         * special case in the paint — but it DOES need one in the frame: a bar
+         * with neither fill nor outline is not a style, it is a bar nobody can
+         * see. So an absent outline is promoted to dashed, which is what the
+         * owner asked for ("white with dashed black lines") and what makes the
+         * swatch honest about what it draws.
+         */
+        const noFill = isNoFill(t.color);
+        const color = noFill ? 'none' : t.color || 'var(--bar-default)';
+        // The ink that frames an unfilled bar. A literal black would disappear
+        // on the dark sheet, so the default is a token that flips with the
+        // theme; an outline colour the planner picked always wins.
+        const ink = t.outlineColor || (noFill ? 'var(--bar-ink)' : color);
+        const outline: BarOutline = noFill && (t.outline ?? 'none') === 'none' ? 'dashed' : t.outline ?? 'none';
         // The dragged value while a drag is in flight, so the fill tracks the
         // handle instead of snapping to it on release (SR-IXC-03).
         const dragPct = dragPreview?.progress.get(t.id);
@@ -248,17 +265,20 @@ export function TaskBars({ layout, dragPreview }: Props) {
                 first bar anyone draws looks like. Weight alone cannot fix it:
                 even a SOLID amber bar is about 2.9:1 on this sheet. An edge
                 can, at any fill. */}
-            <rect
-              x={x + 0.5}
-              y={barTop + 0.5}
-              width={Math.max(0, width - 1)}
-              height={BAR_DRAWN_H - 1}
-              fill={color}
-              stroke={color}
-              strokeWidth={1}
-              style={{ fillOpacity: 'var(--bar-track-a)', strokeOpacity: 'var(--bar-edge-a)' }}
-              pointerEvents="none"
-            />
+            {!noFill && (
+              <rect
+                data-pp-track="1"
+                x={x + 0.5}
+                y={barTop + 0.5}
+                width={Math.max(0, width - 1)}
+                height={BAR_DRAWN_H - 1}
+                fill={color}
+                stroke={color}
+                strokeWidth={1}
+                style={{ fillOpacity: 'var(--bar-track-a)', strokeOpacity: 'var(--bar-edge-a)' }}
+                pointerEvents="none"
+              />
+            )}
             {pct > 0 && (
               <rect
                 className="bar-progress-fill"
@@ -267,7 +287,11 @@ export function TaskBars({ layout, dragPreview }: Props) {
                 y={barTop}
                 width={fillWidth}
                 height={BAR_DRAWN_H}
-                fill={color}
+                /* An unfilled bar still has progress to show. Painting it in
+                   the frame's own ink, held well back, keeps the bar reading
+                   as white paper while still saying how far along it is. */
+                fill={noFill ? ink : color}
+                opacity={noFill ? 0.18 : undefined}
                 pointerEvents="none"
               />
             )}
@@ -275,17 +299,20 @@ export function TaskBars({ layout, dragPreview }: Props) {
                 frames the whole span rather than only the remaining part,
                 and `pointer-events: none` so it adds no hit target — an
                 invisible one is exactly what SRS-EDIT-079 is about. */}
-            {t.outline && t.outline !== 'none' && (
+            {outline !== 'none' && (
               <rect
                 className="bar-outline"
+                data-pp-outline={outline}
                 x={x + 0.5}
                 y={barTop + 0.5}
                 width={Math.max(0, width - 1)}
                 height={BAR_DRAWN_H - 1}
                 fill="none"
-                stroke={t.outlineColor || color}
-                strokeWidth={1}
-                strokeDasharray={t.outline === 'dashed' ? '3 2' : undefined}
+                stroke={ink}
+                /* The frame IS the bar when there is no fill, so it carries a
+                   little more weight — a hairline reads as a hint, not a bar. */
+                strokeWidth={noFill ? 1.25 : 1}
+                strokeDasharray={outline === 'dashed' ? '3 2' : undefined}
                 pointerEvents="none"
               />
             )}

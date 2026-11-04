@@ -109,6 +109,45 @@ export const DATE_ANCHORS: readonly DateAnchor[] = ['start', 'middle', 'end'];
 export type BarOutline = 'none' | 'thin' | 'dashed';
 export const BAR_OUTLINES: readonly BarOutline[] = ['none', 'thin', 'dashed'];
 
+/**
+ * A bar with no fill at all (SRS-ELEM-075).
+ *
+ * The owner asked for "one which has no colors, like white &mdash; typically
+ * white with dashed black lines". It is a VALUE of the colour, not a fourth
+ * field: a sentinel in `color` travels through save, load, copy, paste and
+ * `apply_batch` with no schema change, and `fill="none"` is what SVG already
+ * calls it.
+ *
+ * Choosing it promotes an absent outline to `dashed`, because a bar with
+ * neither fill nor outline is not a style, it is a bar that disappeared.
+ */
+export const NO_FILL = 'none';
+
+export function isNoFill(color: string | undefined | null): boolean {
+  return color === NO_FILL;
+}
+
+/**
+ * The rule drawn between rows (SRS-LAY-061).
+ *
+ * It used to be one hardcoded hairline above each group header. The owner
+ * asked to configure it: a line whose width is theirs to pick, or a dashed or
+ * dotted one. `solid` at width 1 over groups is exactly what the chart drew
+ * before the setting existed, so a file written without it looks unchanged.
+ */
+export type RowSeparator = 'none' | 'solid' | 'dashed' | 'dotted';
+export const ROW_SEPARATORS: readonly RowSeparator[] = ['none', 'solid', 'dashed', 'dotted'];
+
+/** Whether the rule lands between every row or only between groups. */
+export type RowSeparatorScope = 'groups' | 'all';
+export const ROW_SEPARATOR_SCOPES: readonly RowSeparatorScope[] = ['groups', 'all'];
+
+export const DEFAULT_ROW_SEPARATOR: RowSeparator = 'solid';
+export const DEFAULT_ROW_SEPARATOR_WIDTH = 1;
+export const DEFAULT_ROW_SEPARATOR_SCOPE: RowSeparatorScope = 'groups';
+/** Widths the picker offers. A rule heavier than this competes with the bars. */
+export const ROW_SEPARATOR_WIDTHS: readonly number[] = [1, 2, 3, 4];
+
 export interface Milestone {
   id: string;
   rowId: string;
@@ -151,6 +190,12 @@ export interface Marker {
 export interface StyleSettings {
   theme: ThemeName;
   preset: string;
+  /** Absent in every file written before 2026-11-04; see DEFAULT_ROW_SEPARATOR. */
+  rowSeparator?: RowSeparator;
+  /** In px. Absent means DEFAULT_ROW_SEPARATOR_WIDTH. */
+  rowSeparatorWidth?: number;
+  /** Absent means DEFAULT_ROW_SEPARATOR_SCOPE, which is what the chart drew before. */
+  rowSeparatorScope?: RowSeparatorScope;
   /**
    * Let bars that cover the same dates share one band instead of stacking
    * into lanes — think-cell's overlap (SRS-LAY-024).
@@ -159,6 +204,26 @@ export interface StyleSettings {
    * setting existed implies, so the field is optional and old files load.
    */
   allowOverlap?: boolean;
+}
+
+/**
+ * What a roadmap written before the separator settings existed means by their
+ * absence (SRS-LAY-061). Read through these rather than inlining `??`, for the
+ * same reason `gridDelimiterOf` exists.
+ */
+export function rowSeparatorOf(style: StyleSettings | undefined): RowSeparator {
+  return style?.rowSeparator ?? DEFAULT_ROW_SEPARATOR;
+}
+
+export function rowSeparatorWidthOf(style: StyleSettings | undefined): number {
+  const w = style?.rowSeparatorWidth ?? DEFAULT_ROW_SEPARATOR_WIDTH;
+  // A width off the end of the picker would still have to draw something
+  // sensible: a file can carry any number, and 0 is "none" said twice.
+  return Math.max(1, Math.min(4, Math.round(w)));
+}
+
+export function rowSeparatorScopeOf(style: StyleSettings | undefined): RowSeparatorScope {
+  return style?.rowSeparatorScope ?? DEFAULT_ROW_SEPARATOR_SCOPE;
 }
 
 export interface Viewport {

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { GanttDocument, Task, Milestone, Bracket, Dependency, Marker, Row, TimeScale } from '../types/document';
+import type { GanttDocument, Task, Milestone, Bracket, Dependency, Marker, Row, TimeScale, StyleSettings } from '../types/document';
 import { sampleDocument } from '../utils/sample';
 import { applyOps, type DocOp } from './docOps';
 
@@ -63,6 +63,8 @@ interface DocumentState {
   setTheme: (theme: GanttDocument['style']['theme']) => void;
   /** Let bars on one row overlap instead of stacking (SRS-LAY-024). */
   setAllowOverlap: (v: boolean) => void;
+  /** The rule between rows: its style, its width and whether it lands on every row (SRS-LAY-061). */
+  setRowSeparator: (patch: Partial<Pick<StyleSettings, 'rowSeparator' | 'rowSeparatorWidth' | 'rowSeparatorScope'>>) => void;
 
   addTask: (task: Task) => void;
   updateTask: (id: string, patch: Partial<Task>, key?: string) => void;
@@ -226,6 +228,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   setFiscalYearStart: (month) => mutate(set, (d) => ({ ...d, calendar: { ...d.calendar, fiscalYearStart: month } })),
   setTheme: (theme) => mutate(set, (d) => ({ ...d, style: { ...d.style, theme } })),
   setAllowOverlap: (v) => mutate(set, (d) => ({ ...d, style: { ...d.style, allowOverlap: v } })),
+  setRowSeparator: (patch) => mutate(set, (d) => ({ ...d, style: { ...d.style, ...patch } })),
 
   addTask: (task) => mutate(set, (d) => ({ ...d, tasks: [...d.tasks, task] })),
   updateTask: (id, patch, key) =>

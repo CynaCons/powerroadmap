@@ -1,0 +1,160 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PowerRoadmap v2.37.0</title>
+<style>
+  :root {
+    --bg: #fbfbfa; --fg: #1d2127; --soft: #5b6270; --dim: #8a909c;
+    --rule: #e2e2dc; --panel: #ffffff; --accent: #1f4e79; --code-bg: #f2f2ee;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15181c; --fg: #e6eaf2; --soft: #a8b0bd; --dim: #79818f;
+      --rule: #272b32; --panel: #1b1f25; --accent: #7e9bc9; --code-bg: #1f242b;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15181c; --fg: #e6eaf2; --soft: #a8b0bd; --dim: #79818f;
+    --rule: #272b32; --panel: #1b1f25; --accent: #7e9bc9; --code-bg: #1f242b;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap {
+    max-width: 920px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 48px 72px;
+  }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; text-wrap: balance; letter-spacing: -0.01em; }
+  .sub { color: var(--soft); margin: 0 0 40px; font-size: 16px; }
+  h2 {
+    font-size: 19px; margin: 44px 0 10px; text-wrap: balance;
+    padding-top: 20px; border-top: 1px solid var(--rule);
+  }
+  h3 { font-size: 15px; margin: 24px 0 6px; color: var(--fg); }
+  p { margin: 0 0 14px; max-width: 68ch; }
+  .soft { color: var(--soft); }
+  figure { margin: 20px 0 8px; }
+  img { max-width: 100%; display: block; border: 1px solid var(--rule); border-radius: 8px; }
+  figcaption { color: var(--dim); font-size: 13px; margin-top: 8px; max-width: 68ch; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 14px 0; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
+  td:first-child { white-space: nowrap; color: var(--soft); }
+  .srs { color: var(--dim); font-size: 12.5px; letter-spacing: 0.4px; margin-top: 10px; }
+  blockquote {
+    margin: 0 0 16px; padding: 10px 16px; border-left: 3px solid var(--accent);
+    background: var(--panel); color: var(--soft); border-radius: 0 6px 6px 0;
+  }
+  .grid { display: flex; flex-wrap: wrap; gap: 16px; }
+  .grid > figure { flex: 1 1 380px; min-width: 0; margin: 0; }
+</style>
+
+<div class="wrap">
+  <h1>Outline-only bars, rows you can move, and a marker band that behaves</h1>
+  <p class="sub">PowerRoadmap v2.37.0 &mdash; six asks from the owner, 4&ndash;5 November 2026.</p>
+
+  <h2>A bar can have no colour at all</h2>
+  <blockquote>"I would like to have one which has no colors, like white &mdash; typically it would be like white with dashed black lines. And then fully black. These are the two most important ones."</blockquote>
+  <p>Both are swatches now. <strong>No fill</strong> is the first one in the palette, drawn as what it produces: white paper inside a dashed dark frame, so it cannot be confused with a white <em>custom</em> colour &mdash; one is a colour, the other is the absence of one. <strong>Black</strong> is the last preset rather than something to open the custom picker for.</p>
+  <p>Choosing no fill promotes an absent outline to dashed. A bar with neither fill nor outline is not a style, it is a bar that disappeared. And the frame's default ink is a token, not a literal black, because black on the dark sheet is the same disappearance by another route &mdash; it resolves to <code>#000000</code> in light and print and <code>#E6EAF2</code> in dark. An outline colour picked by hand always wins.</p>
+
+  <figure>
+    <img src="bars-light.png" alt="A roadmap in the light theme. The ECU extract bar is drawn as white with a dashed black outline; BSW configuration is solid black; NvM and memory stack is crimson; Sensor acquisition is cyan.">
+    <figcaption>Left to right down the plan: <em>ECU extract</em> unfilled with a dashed black frame, <em>BSW configuration</em> fully black, and two of the eight new vibrant hues. The MARKERS band sits on the bottom edge with nothing under it.</figcaption>
+  </figure>
+
+  <h3>More colours, and more vibrant ones</h3>
+  <p>Eight more presets plus black, for seventeen. The original eight stream hues stay first and unchanged &mdash; they are the colours every existing plan was drawn with, and a palette that reorders itself loses a planner their colour. A milestone can now take a colour of its own too: it could be given a <em>label</em> colour but not a colour, so the diamond was stuck at the default while the words beside it were free.</p>
+  <p class="srs">SRS-ELEM-075 &middot; SRS-ELEM-076</p>
+
+  <h2>The rule between rows is yours to set</h2>
+  <blockquote>"Is it possible to configure an inter-row separator? I would like that separator to have different styles &mdash; either a line and I can choose the width of the line, or a dashed line or a dotted line."</blockquote>
+  <p>None, line, dashed or dotted; one to four pixels; between sections or between every row. The width and the scope only appear once there is a line to apply them to, rather than sitting dead under "None". The dash pattern scales with the width, or a 4px dashed rule is a solid one with a rumour of a gap.</p>
+
+  <div class="grid">
+    <figure>
+      <img src="settings-separator.png" alt="The settings panel, Chart look section, showing Row separator with None, Line, Dashed and Dotted; then 1px to 4px; then Between sections and Between every row.">
+      <figcaption>The control, in Chart look. It is saved with the plan, so it travels with the file.</figcaption>
+    </figure>
+    <figure>
+      <img src="separators-light.png" alt="The same roadmap with a dashed two-pixel rule between every row.">
+      <figcaption>Dashed, 2px, between every row.</figcaption>
+    </figure>
+  </div>
+
+  <h3>What the screenshots caught that the tests did not</h3>
+  <p>The first working version drew all 38 rules in <code>--color-border-soft</code>, the token the quiet default uses. Measured against the sheet that is <strong>1.23:1</strong> &mdash; a planner who went into Settings and deliberately switched on a 2px dashed rule would have got 38 lines they cannot see, and reported the feature as broken. Every test passed. A rule somebody chose now takes its own ink, measured at <strong>2.74:1</strong> in light and <strong>4.25:1</strong> in dark; the untouched default keeps the whisper, so a plan written before the setting existed is unchanged.</p>
+  <p class="srs">SRS-LAY-061</p>
+
+  <h2>The row menu, and moving rows by hand</h2>
+  <blockquote>"Instead of having all these, like, moving to, moving to, moving to sections, which makes a very, very large menu, we could have a generic move and then a follow-up. And the entries to add a new row below &mdash; usually when I right-click on the entries in the left-side panel, that's because I want to add a new row below."</blockquote>
+  <p>The menu used to push one <code>Move into "X"</code> per section, so its height was a function of the plan: a programme with a dozen streams opened a dozen near-identical lines. Behind one item they are a list, which is what they always were. One level of nesting only &mdash; a second would reintroduce the same wall one step further in.</p>
+  <p><strong>Add row above</strong> and <strong>Add row below</strong> now lead the menu. They existed only on the chart background, which is the one place a planner is not looking when they want a row next to <em>this</em> one. A new row inherits the clicked row's section, so adding below a row inside Platform lands inside Platform.</p>
+
+  <figure>
+    <img src="row-menu.png" alt="The row context menu: Add row above, Add row below, Rename row, Move up, Move down, Wrap in a new section, and Move to section with a submenu listing the plan's sections.">
+    <figcaption>Adding comes first; the sections live behind one entry.</figcaption>
+  </figure>
+
+  <h3>Dragging</h3>
+  <p>A row reorders by dragging it in the row list, by pointer or by finger, with a line showing where it will land. <code>move_row</code> already existed and already carried a section's children with it, so this is an affordance over an operation that worked rather than new document behaviour. The arithmetic is the part worth being sure about: the operation indexes into the rows that <em>remain</em> once the moving ones are lifted out, not into the list on screen &mdash; off by one there puts a row one place too far, in the direction nobody notices until the plan is wrong. It is a pure function with seven tests on it.</p>
+  <p class="srs">SRS-EDIT-090 &middot; SRS-EDIT-091</p>
+
+  <h2>The marker band</h2>
+  <blockquote>"There is a floating marker band at the bottom that is kind of unusable. It should really be at the bottom of the chart &mdash; there shouldn't be anything below. Right now it's floating about 50 pixels above the bottom. And it's hard to move the marker. There is no preview, so I don't really know what I'm dragging. Maybe I can only drag it per week, I don't really know."</blockquote>
+  <p>Four separate faults, and the owner's "about 50 pixels" was exactly right.</p>
+  <table>
+    <tr><th>What was wrong</th><th>Why</th></tr>
+    <tr>
+      <td>Floating 52px up</td>
+      <td>A <code>CHROME_H = 52</code> reserved room for a command bar that floated over the chart's foot. It does not: the command bar is <code>grid-area: panel</code>, its own column. The 52 bought nothing and cost two things &mdash; a dead strip under the band, and a plan that could be scrolled 52px past its own end. Measured after: a gap of <strong>0px</strong>.</td>
+    </tr>
+    <tr>
+      <td>"Stuff appears differently" on hover</td>
+      <td>A marker is drawn as two things far apart &mdash; a dashed rule up the plot and a chip at the foot &mdash; and each answered the pointer alone, with different cursors (<code>ew-resize</code> and <code>move</code>). The planner met two objects and could not tell they were one. Both now share a hover and a cursor.</td>
+    </tr>
+    <tr>
+      <td>"There is no preview"</td>
+      <td>There was, but it rode above the chip at the foot of the chart. Grab the rule near the top of a tall plan and the readout was off screen. It now rides the top of the visible plot, beside the time axis where dates are read.</td>
+    </tr>
+    <tr>
+      <td>"Maybe per week, I don't really know"</td>
+      <td>Correct, and never said. <code>snapDelta</code> rounds to seven days on every scale but <code>day</code>. The readout says <em>in steps of a week</em> while the pointer is down. The rule's hit target also went from 10px to 14px.</td>
+    </tr>
+  </table>
+  <figure>
+    <img src="marker-band.png" alt="The foot of the chart: the MARKERS band flush with the bottom edge, holding a Gate review chip.">
+    <figcaption>The band on the bottom edge. Nothing below it.</figcaption>
+  </figure>
+  <p class="srs">SRS-ELEM-077</p>
+
+  <h2>Both themes</h2>
+  <figure>
+    <img src="bars-dark.png" alt="The same roadmap in the dark theme: the unfilled bar is framed in a light dashed line, and the row rules read against the dark sheet.">
+    <figcaption>The dark sheet, where the two tokens earn their keep: the unfilled bar's frame flips to <code>#E6EAF2</code> and the chosen row rule measures 4.25:1. A literal black would have been an invisible bar and an invisible rule.</figcaption>
+  </figure>
+
+  <h2>Verification</h2>
+  <p>What was run, and what it said. The owner asked for a quick release and for only the changed surface to be tested, so this is the affected set rather than the whole suite &mdash; named here so the gap is visible rather than implied.</p>
+  <table>
+    <tr><th>Gate</th><th>Result</th></tr>
+    <tr><td><code>tsc -b --force</code></td><td>clean</td></tr>
+    <tr><td><code>npm test</code> (whole unit suite)</td><td>574 passed, 0 failed, across 72 files &mdash; 21 of those tests new here, in 4 new files</td></tr>
+    <tr><td>e2e, the 15 specs this change can reach</td><td>98 passed, 0 failed, on desktop</td></tr>
+    <tr><td>Contrast, measured in the running app</td><td>chosen row rule 2.74:1 light / 4.25:1 dark, up from 1.23:1; unfilled bar frame <code>#000000</code> light, <code>#E6EAF2</code> dark</td></tr>
+    <tr><td>Marker band, measured in the running app</td><td>0px below the band, down from 52px</td></tr>
+    <tr><td><code>npm run build:template</code></td><td>see the release notes for the built size</td></tr>
+  </table>
+
+  <h3>What went red on the way</h3>
+  <p>Three e2e tests failed on their first run and all three were the test's fault, not the product's. One asked whether <em>any</em> rect in a bar's group was still filled and caught the selection grips, which are not the bar's fill &mdash; fixed by giving the painted body its own hook. One dragged the first row downward, which is a section dropped among its own children, correctly refused as a no-op; it was asserting "something changed" against a case that was right. One asked <code>toBeVisible</code> of an SVG <code>&lt;line&gt;</code>, which has no box, so Playwright calls every rule on the sheet hidden. They are written down because a suite that only ever shows its final green hides the three hours in the middle.</p>
+  <p>Not run: the tablet and mobile projects, and the eleven e2e specs this change cannot reach. The harness on this machine leaks one WebKit process per browser context until it starves itself, which is on the backlog.</p>
+</div>

@@ -180,7 +180,11 @@ function TaskBody({ id }: { id: string }) {
         />
       </Field>
       <Field label="Colour">
-        <ColorPalette value={task.color ?? '#1F4E79'} onChange={(color) => updateTask(task.id, { color })} />
+        <ColorPalette
+          value={task.color ?? '#1F4E79'}
+          onChange={(color) => updateTask(task.id, { color })}
+          allowNoFill
+        />
       </Field>
       <Field label="Notes">
         <textarea

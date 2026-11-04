@@ -7,6 +7,7 @@ import { newId } from '../utils/ids';
 import { ColorPalette } from './ColorPalette';
 import { deleteSelection } from './documentActions';
 import type { Task, Milestone, Marker, Bracket, Dependency, DependencyType, DateAnchor, BarOutline } from '../types/document';
+import { isNoFill } from '../types/document';
 
 /**
  * Quick actions for what is selected (PLAN.md v2.20.0).
@@ -145,11 +146,18 @@ function TaskFields({ task }: { task: Task }) {
   const deleteTask = useDocumentStore((s) => s.deleteTask);
   const clear = useSelectionStore((s) => s.clear);
   const outline = task.outline ?? 'none';
+  // An unfilled bar is framed whatever the chooser says, so its outline colour
+  // is reachable even while that chooser reads None (SRS-ELEM-075).
+  const noFill = isNoFill(task.color);
 
   return (
     <>
       <Group label="Task">
-        <ColorPalette value={task.color ?? '#1F4E79'} onChange={(color) => updateTask(task.id, { color })} />
+        <ColorPalette
+          value={task.color ?? '#1F4E79'}
+          onChange={(color) => updateTask(task.id, { color })}
+          allowNoFill
+        />
         <WrapInBracket taskIds={[task.id]} />
         <DetailsButton what="Task" target={{ kind: 'task', id: task.id }} />
         <DeleteButton what="task" onClick={() => { deleteTask(task.id); clear(); }} />
@@ -176,7 +184,7 @@ function TaskFields({ task }: { task: Task }) {
           ))}
         </div>
       </div>
-      {outline !== 'none' && (
+      {(outline !== 'none' || noFill) && (
         <Group label="Outline colour">
           <ColorPalette
             value={task.outlineColor ?? task.color ?? '#1F4E79'}
@@ -257,6 +265,17 @@ function MilestoneFields({ milestone }: { milestone: Milestone }) {
         <DeleteButton what="milestone" onClick={() => { remove(milestone.id); clear(); }} />
       </Group>
       <AnchorChoice anchor={milestone.anchor} onChange={(anchor) => update(milestone.id, { anchor })} />
+      {/* The diamond's own colour. A milestone could be given a label colour
+          but not a colour, so the mark itself was stuck at the default while
+          the words beside it could be anything (owner, 2026-11-04: "more
+          colours ... especially for the task and the milestones"). */}
+      <Group label="Milestone colour">
+        <ColorPalette
+          value={milestone.color ?? 'var(--color-milestone)'}
+          onChange={(color) => update(milestone.id, { color })}
+          what="milestone"
+        />
+      </Group>
       <Group label="Label colour">
         <ColorPalette
           value={milestone.textColor ?? '#3D4551'}

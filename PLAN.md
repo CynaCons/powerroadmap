@@ -1170,21 +1170,26 @@ Four questions the prototypes must put in front of the owner, because they are v
 - [x] Settings is reachable from the command palette [agent: claude]
 - [x] The bridge spec notices when another server owns the token file [agent: claude]
 
-### v2.37.0 — Outline-only bars, and rows moved by hand (current) (ACTIVE)
+### v2.37.0 — Outline-only bars, and rows moved by hand (COMPLETE)
 **Goal:** Bars can be outline only, and rows are moved by hand.
-- [ ] SRS rows for outline-only bars and row reordering
-- [ ] A bar can be drawn with no fill, outline only
-- [ ] Choosing no fill gives an outline so the bar cannot vanish
-- [ ] The outline ink reads in light, dark and print
-- [ ] The context menu supports one level of submenu
-- [ ] The row menu offers one Move with a follow-up
-- [ ] The row menu can add a row above or below
-- [ ] Rows reorder by dragging them in the row list
-- [ ] Dragging a section carries its rows with it
-- [ ] Dragging answers touch as well as the mouse
-- [ ] Unit and e2e tests for the three changes
-- [ ] Cold walkthrough of the row menu and dragging
-- [ ] Showcase artifact with real screenshots
+- [x] SRS rows for outline-only bars and row reordering [agent: claude]
+- [x] A bar can be drawn with no fill, outline only [agent: claude]
+- [x] Choosing no fill gives an outline so the bar cannot vanish [agent: claude]
+- [x] The outline ink reads in light, dark and print [agent: claude]
+- [x] The context menu supports one level of submenu [agent: claude]
+- [x] The row menu offers one Move with a follow-up [agent: claude]
+- [x] The row menu can add a row above or below [agent: claude]
+- [x] Rows reorder by dragging them in the row list [agent: claude]
+- [x] Dragging a section carries its rows with it [agent: claude]
+- [x] Dragging answers touch as well as the mouse [agent: claude]
+- [x] Unit and e2e tests for the three changes [agent: claude]
+- [x] Cold walkthrough of the row menu and dragging [agent: claude]
+- [x] Showcase artifact with real screenshots [agent: claude]
+- [x] More colours to choose, and more vibrant ones [agent: claude]
+- [x] A milestone can be given its own colour [agent: claude]
+- [x] The marker band sits at the bottom of the chart [agent: claude]
+- [x] A marker says what it is doing while it is dragged [agent: claude]
+- [x] Hovering a marker lights its rule and its chip together [agent: claude]
 
 # Backlog (High-level, unscheduled — product & long-horizon only)
 - Cloud / sharing edition

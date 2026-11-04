@@ -183,6 +183,33 @@ export function ChartContextMenu() {
       (r) => doc.rows.some((c) => c.groupId === r.id) && r.id !== rowId && r.id !== row.groupId,
     );
 
+    /*
+     * Adding a row comes FIRST (owner, 2026-11-03: "usually when I right-click
+     * on the entries in the left-side panel, that's because I want to add a new
+     * row below"). It existed only on the chart background, which is the one
+     * place a planner is not looking when they want a row next to this one.
+     *
+     * A new row inherits the clicked row's section, so adding below a row
+     * inside "Platform" lands inside "Platform" rather than at the top level.
+     */
+    const addRowAt = (at: number) => {
+      const id = newId('row');
+      docActions.addRow({ id, label: 'New row', groupId: isSection ? rowId : row.groupId ?? null });
+      docActions.moveRow(id, at);
+    };
+    items.push({
+      id: 'add-row-above',
+      label: 'Add row above',
+      icon: Rows3,
+      onClick: () => addRowAt(index),
+    });
+    items.push({
+      id: 'add-row-below',
+      label: 'Add row below',
+      icon: Rows3,
+      onClick: () => addRowAt(index + 1),
+    });
+    items.push({ id: 'rs0', separator: true });
     items.push({
       id: 'rename-row',
       label: 'Rename row…',
@@ -220,20 +247,40 @@ export function ChartContextMenu() {
           docActions.updateRow(rowId, { groupId: id });
         },
       });
-      for (const s of sections) {
+      /*
+       * One Move, not one per section (owner, 2026-11-03: "instead of having
+       * all these, like, moving to, moving to, moving to sections, and so on,
+       * which makes very, very large menu, we could have a generic move, and
+       * then a follow-up").
+       *
+       * The old loop pushed an entry PER SECTION, so the menu's height was a
+       * function of the plan: a programme with a dozen streams opened a dozen
+       * near-identical lines between "Wrap in a new section" and Delete. Behind
+       * one item they are a list, which is what they always were.
+       */
+      if (sections.length > 0 || row.groupId) {
         items.push({
-          id: `into-${s.id}`,
-          label: `Move into “${s.label}”`,
+          id: 'move-to',
+          label: 'Move to section',
           icon: FolderInput,
-          onClick: () => docActions.updateRow(rowId, { groupId: s.id }),
-        });
-      }
-      if (row.groupId) {
-        items.push({
-          id: 'ungroup',
-          label: 'Take out of its section',
-          icon: FolderInput,
-          onClick: () => docActions.updateRow(rowId, { groupId: null }),
+          submenu: [
+            ...sections.map((s) => ({
+              id: `into-${s.id}`,
+              label: s.label,
+              icon: FolderInput,
+              onClick: () => docActions.updateRow(rowId, { groupId: s.id }),
+            })),
+            ...(row.groupId
+              ? [
+                  { id: 'ungroup-sep', separator: true },
+                  {
+                    id: 'ungroup',
+                    label: 'Take out of its section',
+                    onClick: () => docActions.updateRow(rowId, { groupId: null }),
+                  },
+                ]
+              : []),
+          ],
         });
       }
     }
